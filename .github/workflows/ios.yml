@@ -1,0 +1,23 @@
+name: iOS derleme kontrolü
+# iOS kabuğunun derlendiğini doğrular (imzasız, simülatör). App Store'a gönderim Codemagic ile yapılır.
+on:
+  push:
+    branches: [main]
+    paths: ['public/**', 'ios/**', '.github/workflows/ios.yml']
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - run: brew install xcodegen
+      - name: Xcode projesini üret
+        working-directory: ios
+        run: xcodegen generate
+      - name: Derle (simülatör, imzasız)
+        working-directory: ios
+        run: |
+          set -o pipefail
+          xcodebuild -project TurnuvaFiksturu.xcodeproj -scheme TurnuvaFiksturu -configuration Release \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO build | tail -n 80

@@ -1,0 +1,33 @@
+{
+  "_aciklama": "tool/asc_islem.py bu dosyayı okuyup App Store Connect'e yazar.",
+  "locale": "tr",
+  "name": "Turnuva Fikstürü",
+  "subtitle": "Lig, eleme, skor, kart takibi",
+  "promotionalText": "Arkadaşlarınla futbol turnuvası mı yapıyorsunuz? Fikstürü kur, skorları ve kartları gir, puan durumu kendiliğinden hesaplansın. Reklamsız, internetsiz.",
+  "keywords": "turnuva,fikstür,lig,puan durumu,eleme,futbol,maç,skor,kart,gol,averaj,arkadaş,konsol,halı saha",
+  "description": "Arkadaşlarınla oynadığın futbol turnuvalarını kâğıt kalemsiz yönet!\n\nKonsol başında, halı sahada ya da masa futbolunda… Turnuva Fikstürü maçları sıraya koyar, skorları ve kartları tutar, puan durumunu kendisi hesaplar.\n\nLİG USULÜ\nHerkes herkesle oynar. Fikstür haftalara bölünerek kendiliğinden çıkar. İstersen rövanşlı (iç saha / dış saha) oynayın.\n\nELEME USULÜ\nKaybeden elenir: çeyrek final, yarı final, final. Oyuncu sayısı tutmazsa bay geçme otomatik ayarlanır. Berabere biten maçlarda penaltı skoru girilir; rövanşlı elemede toplam skor hesaplanır. Sonunda şampiyon ilan edilir.\n\nSKOR VE KART TAKİBİ\nHer maç için gol, sarı kart ve kırmızı kart gir. Yanlış girdiysen \"Düzenle\" ile değiştir.\n\nPUAN DURUMU\nOynanan, galibiyet, beraberlik, mağlubiyet, atılan ve yenen gol, averaj, kartlar ve puan tek tabloda. Galibiyet 3, beraberlik 1 puan.\n\nOYUNCU YÖNETİMİ\nTurnuva sürerken oyuncu adlarını değiştir; ligde yeni oyuncu ekle, maçları kendiliğinden eklensin.\n\nİNTERNETSİZ VE REKLAMSIZ\nHesap yok, reklam yok, internet gerekmez. Veriler yalnızca telefonunda kalır.\n\nAçık ve koyu tema telefonunun ayarına göre değişir.",
+  "supportUrl": "https://sviappdeveloper-sketch.github.io/ps-turnuva/destek.html",
+  "marketingUrl": "https://sviappdeveloper-sketch.github.io/ps-turnuva/",
+  "privacyPolicyUrl": "https://sviappdeveloper-sketch.github.io/ps-turnuva/gizlilik.html",
+  "copyright": "2026 Seyfullah Sivi",
+  "primaryCategory": "SPORTS",
+  "secondaryCategory": "UTILITIES",
+  "contentRights": "DOES_NOT_USE_THIRD_PARTY_CONTENT",
+  "review": {
+    "contactFirstName": "Seyfullah",
+    "contactLastName": "Sivi",
+    "contactEmail": "sviapp.developer@gmail.com",
+    "contactPhone": "",
+    "demoAccountRequired": false,
+    "notes": "Turnuva Fikstürü is an offline tournament organizer for friends' football matches (console, five-a-side, table football). No account, no ads, no network access; all data stays on the device. To test: add at least 2 player names, choose 'Lig' (round robin) or 'Eleme' (knockout), tap 'Turnuvayı başlat', enter scores and cards for a match and tap 'Skoru kaydet'. The standings tab updates automatically. 'Sıfırla' (tap twice) deletes all data."
+  },
+  "screenshots": {
+    "APP_IPHONE_67": [
+      "app-store/ekran-goruntuleri/1.png",
+      "app-store/ekran-goruntuleri/2.png",
+      "app-store/ekran-goruntuleri/3.png",
+      "app-store/ekran-goruntuleri/4.png",
+      "app-store/ekran-goruntuleri/5.png"
+    ]
+  }
+}

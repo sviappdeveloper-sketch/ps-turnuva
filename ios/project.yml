@@ -1,0 +1,42 @@
+# XcodeGen proje tanımı: `xcodegen generate` → TurnuvaFiksturu.xcodeproj
+# (Xcode projesi depoya konmaz; Codemagic ve GitHub Actions derlemeden önce üretir.)
+name: TurnuvaFiksturu
+options:
+  deploymentTarget:
+    iOS: "15.0"
+  developmentLanguage: tr
+configFiles:
+  Debug: Config.xcconfig
+  Release: Config.xcconfig
+targets:
+  TurnuvaFiksturu:
+    type: application
+    platform: iOS
+    scheme: {}
+    sources:
+      - path: Sources
+      - path: Resources
+      - path: ../public
+        type: folder
+        buildPhase: resources
+    info:
+      path: Sources/Info.plist
+      properties:
+        CFBundleDisplayName: Fikstür
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        CFBundleDevelopmentRegion: tr
+        LSRequiresIPhoneOS: true
+        ITSAppUsesNonExemptEncryption: false
+        UIRequiresFullScreen: true
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        UILaunchScreen:
+          UIColorName: LaunchBG
+    settings:
+      base:
+        PRODUCT_NAME: TurnuvaFiksturu
+        TARGETED_DEVICE_FAMILY: "1"
+        DEVELOPMENT_TEAM: GS55JS3WKJ
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        SWIFT_VERSION: "5.0"
+        CODE_SIGN_STYLE: Automatic
