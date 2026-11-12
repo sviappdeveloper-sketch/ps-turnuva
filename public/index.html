@@ -114,7 +114,9 @@ function num(id){var e=$("#"+id),v=e?parseInt(e.value,10):0;return isNaN(v)||v<0
 function sv(i){var x=S.matches[i];
   x.hg=num("g"+i+"h");x.ag=num("g"+i+"a");x.hy=num("y"+i+"h");x.ay=num("y"+i+"a");x.hr=num("k"+i+"h");x.ar=num("k"+i+"a");
   if(S.mode==="eleme"){x.ph=num("p"+i+"h");x.pa=num("p"+i+"a");var tied=x.hg===x.ag;if(S.legs===2){tied=false;if(x.leg===2){var a1=S.matches.filter(function(m){return m.r===x.r&&m.k===x.k&&m.leg===1})[0];tied=a1.hg+x.ag===a1.ag+x.hg}}if(!tied){x.ph=0;x.pa=0}else if(x.ph===x.pa){var er=$("#er"+i);if(er)er.textContent="Eşitlikte penaltı skoru farklı olmalı.";return}}
-  x.d=1;if(S.mode==="eleme"){if(S.legs===2&&x.leg===1)S.matches.forEach(function(m){if(m.r===x.r&&m.k===x.k&&m.leg===2)m.d=0});adv()}save();render()}
+  x.d=1;if(S.mode==="eleme"){if(S.legs===2&&x.leg===1)S.matches.forEach(function(m){if(m.r===x.r&&m.k===x.k&&m.leg===2)m.d=0});adv()}save();render();reklamSay()}
+// iPhone uygulamasında her 5 skor kaydında bir tam ekran reklam (reklam yoksa hiçbir şey yapmaz)
+function reklamSay(){try{if(!window.TFReklam)return;var n=(parseInt(localStorage.getItem("pst1-kayit")||"0",10)||0)+1;localStorage.setItem("pst1-kayit",String(n));if(n%5===0)setTimeout(function(){window.TFReklam.goster()},400)}catch(e){}}
 function ed(i){S.matches[i].d=0;if(S.mode==="eleme")adv();save();render()}
 function inp(id,v){return'<input id="'+id+'" type="number" inputmode="numeric" min="0" value="'+v+'">'}
 function setup(){

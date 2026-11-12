@@ -2,3 +2,9 @@
 MARKETING_VERSION = 1.0.0
 CURRENT_PROJECT_VERSION = 1
 PRODUCT_BUNDLE_IDENTIFIER = com.sviapp.turnuvafiksturu
+
+// AdMob → Uygulamalar → iOS uygulaması (Turnuva Fikstürü). Şimdilik Google'ın TEST kimlikleri:
+// test kimlikleri durdukça uygulama REKLAMSIZ çalışır (mağazaya "Test Ad" çıkmasın diye).
+// Gerçek iOS kimliklerini yazınca her 5 skor kaydında bir tam ekran reklam gösterilir.
+TF_ADMOB_APP_ID = ca-app-pub-3940256099942544~1458002511
+TF_AD_INTERSTITIAL = ca-app-pub-3940256099942544/4411468910

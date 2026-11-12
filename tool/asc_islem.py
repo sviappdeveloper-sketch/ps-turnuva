@@ -7,7 +7,7 @@ Yaptıkları (her çalıştırmada baştan, güvenle tekrar edilebilir):
  3. Sürüm (Config.xcconfig'teki MARKETING_VERSION) yoksa açar; telif satırını yazar.
  4. Sürüm metinleri: açıklama, anahtar kelimeler, tanıtım metni, destek ve pazarlama adresi.
  5. iPhone ekran görüntüleri (6.9"): app-store/ekran-goruntuleri/*.png yüklenir (eskiler silinir).
- 6. Yaş derecelendirmesi: şiddet/kumar/cinsellik/reklam yok.
+ 6. Yaş derecelendirmesi: şiddet/kumar/cinsellik yok, reklam var.
  7. İçerik hakları ve inceleme iletişim bilgileri + inceleme notu.
  8. Bu sürüme ait en son işlenmiş derlemeyi bekler ve sürüme bağlar.
  9. GONDER=evet ise sürümü Apple incelemesine gönderir.
@@ -199,7 +199,7 @@ if VLOC:
 
 
 # ---------------------------------------------------------------- 6) yaş derecelendirmesi
-YENI_SORULAR = {"advertising": False, "userGeneratedContent": False, "messagingAndChat": False, "parentalControls": False,
+YENI_SORULAR = {"advertising": True, "userGeneratedContent": False, "messagingAndChat": False, "parentalControls": False,
                 "ageAssurance": False, "healthOrWellnessTopics": False, "lootBox": False, "gunsOrOtherWeapons": "NONE"}
 
 
