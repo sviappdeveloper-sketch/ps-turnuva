@@ -29,7 +29,7 @@ codemagic.yaml   ← derleme, yükleme, mağaza sayfası, incelemeye gönderme
 ## Notlar
 
 - Ad "PS Turnuva" değil: "PS" Sony'nin markası, Apple bu tür adları reddediyor. Açıklama ve anahtar kelimelerde de PlayStation, FIFA, EA FC gibi markalar kullanılmadı.
-- Turnuva verileri yalnızca telefondaki localStorage'da (anahtar `pst1`) durur.
+- Turnuva verileri yalnızca telefondaki localStorage'da durur: anahtar `tf2` (tüm turnuvalar ve kayıtlı listeler). Eski tek turnuvalık `pst1` verisi ilk açılışta kendiliğinden içeri alınır.
 - Reklam: her 5 skor kaydında bir tam ekran AdMob reklamı. `ios/Config.xcconfig` içinde Google'ın test kimlikleri durdukça uygulama reklamsız çalışır; gerçek iOS kimliklerini (`TF_ADMOB_APP_ID`, `TF_AD_INTERSTITIAL`) yazınca reklamlar açılır.
 
 ### Uygulama Gizliliği yanıtları (AdMob ile)
