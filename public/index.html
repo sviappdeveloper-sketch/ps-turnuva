@@ -203,7 +203,8 @@ function menu(){
   if(c){var st=statusOf(c);if(!st.done)h+='<button class="big" onclick="openT(\''+c.id+'\')"><span class="ic">▶</span><span>Devam et: '+esc(c.name)+'<small>'+(c.mode==="eleme"?"Turnuva":"Lig")+" · "+st.d+"/"+st.n+" maç oynandı</small></span></button>"}
   h+='<button class="big" onclick="newT(\'lig\')"><span class="ic">📋</span><span>Lig Fikstürü<small>Herkes herkesle oynar, puan tablosu</small></span></button>';
   h+='<button class="big" onclick="newT(\'eleme\')"><span class="ic">🏆</span><span>Turnuva Fikstürü<small>Eleme usulü, kaybeden elenir, final oynanır</small></span></button>';
-  h+='<div style="height:14px"></div><button class="big alt" onclick="go(\'saved\')"><span class="ic">📁</span><span>Kayıtlı turnuvalarım'+(ids.length?" ("+ids.length+")":"")+'<small>Önceki turnuvalar, kayıtlı takım/oyuncu listeleri ve aynı takımlarla geçmiş istatistikler</small></span></button>';
+  h+='<div style="height:14px"></div><button class="big alt" onclick="go(\'stats\')"><span class="ic">📊</span><span>İstatistikler<small>Tüm turnuvalarda genel tablo ve oyuncular arası karşılaşmalar</small></span></button>';
+  h+='<button class="big alt" onclick="go(\'saved\')"><span class="ic">📁</span><span>Kayıtlı turnuvalarım'+(ids.length?" ("+ids.length+")":"")+'<small>Önceki turnuvalar, kayıtlı takım/oyuncu listeleri ve aynı takımlarla geçmiş istatistikler</small></span></button>';
   return h}
 function setup(){
   var lig=V.mode!=="eleme",h=head(lig?"Lig Fikstürü":"Turnuva Fikstürü");
@@ -311,11 +312,48 @@ function h2h(){var n=S.players.length;if(n<2)return"";
   Object.keys(DB.tours).forEach(function(id){var T=DB.tours[id];if(T.id===S.id)T=S;var r=pair(T,an,bn);if(!r.o)return;nt++;["o","w","d","l","gf","ga","y1","y2","k1","k2"].forEach(function(f){t[f]+=r[f]})});
   if(nt>1||(nt===1&&!q.o))h+='<div class="lbl">Tüm turnuvalarda ('+nt+")</div>"+hbox(t,A,B);
   return h+"</div>"+(S.mode==="eleme"?'<div class="mu">Berabere biten eleme maçı penaltıyı kazanana yazılır.</div>':"")}
+// ana menüdeki İstatistikler: kayıtlı bütün turnuvalar (isimler büyük-küçük harf önemsiz eşleşir)
+function stats(){
+  var ts=Object.keys(DB.tours).map(function(id){return DB.tours[id]}).sort(function(a,b){return(a.created||0)-(b.created||0)});
+  var h=head("İstatistikler"),A={},P={};
+  ts.forEach(function(T){var st=statusOf(T),seen={};
+    withS(T,function(){table().forEach(function(r){var c=canon(r.n),a=A[c]=A[c]||{c:c,n:r.n,t:0,ch:0,o:0,g:0,b:0,m:0,gf:0,ga:0,y:0,k:0};a.n=r.n;
+      if(!seen[c]){seen[c]=1;a.t++}["o","g","b","m","gf","ga","y","k"].forEach(function(f){a[f]+=r[f]})})});
+    if(st.done&&A[canon(st.win)])A[canon(st.win)].ch++;
+    T.matches.forEach(function(x){if(!x.d||x.bye||x.h<0||x.a<0)return;var hn=canon(T.players[x.h]),an=canon(T.players[x.a]),f=hn<an,id=f?hn+"|"+an:an+"|"+hn;P[id]=(P[id]||0)+1})});
+  var rows=Object.keys(A).map(function(c){return A[c]}).filter(function(r){return r.o||r.ch}).sort(function(a,b){return b.ch-a.ch||b.g-a.g||(b.g*3+b.b)-(a.g*3+a.b)||(b.gf-b.ga)-(a.gf-a.ga)||b.gf-a.gf});
+  if(!rows.length)return h+'<div class="card mu">Henüz oynanmış maç yok. Bir lig ya da turnuva başlatıp skor girince istatistikler burada toplanır.</div>';
+  var nm=function(c){return esc(A[c]?A[c].n:c)};
+  h+='<div class="mu" style="text-align:left;margin-bottom:10px">'+ts.length+" turnuva · "+rows.length+" oyuncu · "+Object.keys(P).reduce(function(s,k){return s+P[k]},0)+" maç</div>";
+  h+='<h2>Genel tablo</h2><div class="card wrap"><table><tr><th>#</th><th class="l">Oyuncu</th><th class="p">🏆</th><th>T</th><th>O</th><th>G</th><th>B</th><th>M</th><th>Gol</th><th>AV</th><th><span class="cy"></span></th><th><span class="cr"></span></th></tr>';
+  rows.forEach(function(r,i){h+='<tr'+(i===0?' class="f"':"")+"><td>"+(i+1)+'</td><td class="l">'+esc(r.n)+'</td><td class="p">'+r.ch+"</td><td>"+r.t+"</td><td>"+r.o+"</td><td>"+r.g+"</td><td>"+r.b+"</td><td>"+r.m+"</td><td>"+r.gf+"-"+r.ga+"</td><td>"+(r.gf-r.ga)+"</td><td>"+r.y+"</td><td>"+r.k+"</td></tr>"});
+  h+='</table></div><div class="mu">🏆 şampiyonluk, T turnuva, O oynanan maç, G/B/M galibiyet/beraberlik/mağlubiyet, Gol atılan-yenen, AV averaj. Eleme maçlarında normal süre skoru sayılır.</div>';
+  // oyuncular arası
+  var cs=rows.map(function(r){return r.c});if(cs.length<2)return h;
+  var a=V.sa,b=V.sb;if(cs.indexOf(a)<0)a=cs[0];if(cs.indexOf(b)<0||b===a)b=cs[0]===a?cs[1]:cs[0];
+  var opt=function(sel){return cs.map(function(c){return'<option value="'+esc(c)+'"'+(c===sel?" selected":"")+">"+nm(c)+"</option>"}).join("")};
+  var t={o:0,w:0,d:0,l:0,gf:0,ga:0,y1:0,y2:0,k1:0,k2:0},per=[];
+  ts.forEach(function(T){var r=pair(T,a,b);if(!r.o)return;per.push([T,r]);["o","w","d","l","gf","ga","y1","y2","k1","k2"].forEach(function(f){t[f]+=r[f]})});
+  h+='<h2>Oyuncular arası</h2><div class="card"><div class="vs"><select id="sa" onchange="ssel()">'+opt(a)+'</select><span>vs</span><select id="sb" onchange="ssel()">'+opt(b)+"</select></div>";
+  if(!t.o)h+='<div class="mu" style="text-align:left;margin-top:10px">Bu ikisi henüz karşılaşmadı.</div>';
+  else{h+=hbox(t,nm(a),nm(b))+'<div class="lbl">Turnuva turnuva</div>';
+    per.slice().reverse().forEach(function(e){var T=e[0],r=e[1];h+='<div class="ml"><span><b>'+esc(T.name)+"</b></span><span style=\"white-space:nowrap\">"+r.w+"G "+r.d+"B "+r.l+"M · "+r.gf+"-"+r.ga+"</span></div>"});
+    h+='<div class="lbl">Maçlar</div>';
+    per.slice().reverse().forEach(function(e){var T=e[0];e[1].ms.forEach(function(x){h+='<div class="ml"><span class="mu" style="margin:0">'+esc(T.name)+'</span><span><b>'+esc(T.players[x.h])+"</b> "+x.hg+" - "+x.ag+" <b>"+esc(T.players[x.a])+"</b>"+((x.ph||x.pa)?' <span class="mu">(pen. '+x.ph+"-"+x.pa+")</span>":"")+"</span></div>"})})}
+  h+="</div>";
+  // bütün eşleşmeler
+  var pk=Object.keys(P).sort(function(x,y){return P[y]-P[x]});
+  h+='<h2>Tüm eşleşmeler</h2><div class="card wrap"><table><tr><th class="l">Eşleşme</th><th>O</th><th>G</th><th>B</th><th>M</th><th>Gol</th></tr>';
+  pk.forEach(function(id){var c=id.split("|"),q={o:0,w:0,d:0,l:0,gf:0,ga:0};ts.forEach(function(T){var r=pair(T,c[0],c[1]);["o","w","d","l","gf","ga"].forEach(function(f){q[f]+=r[f]})});
+    h+='<tr onclick="V.sa=\''+esc(c[0]).replace(/'/g,"\\'")+'\';V.sb=\''+esc(c[1]).replace(/'/g,"\\'")+'\';render();window.scrollTo(0,$(\'.vs\').getBoundingClientRect().top+scrollY-80)" style="cursor:pointer"><td class="l">'+nm(c[0])+" – "+nm(c[1])+"</td><td>"+q.o+"</td><td>"+q.w+"</td><td>"+q.d+"</td><td>"+q.l+"</td><td>"+q.gf+"-"+q.ga+"</td></tr>"});
+  return h+'</table></div><div class="mu">G/B/M soldaki isme göre. Bir satıra dokununca o ikilinin ayrıntısı açılır.</div>'}
+function ssel(){V.sa=$("#sa").value;V.sb=$("#sb").value;render()}
 function render(){
   var h;
   if(V.v==="setup")h=setup();
   else if(V.v==="saved")h=saved();
   else if(V.v==="hist")h=hist();
+  else if(V.v==="stats")h=stats();
   else if(V.v!=="tour"||!S)h=menu();
   else{
     var d=S.matches.filter(function(x){return x.d&&!x.bye}).length;
