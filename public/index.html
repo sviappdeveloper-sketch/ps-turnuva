@@ -41,7 +41,8 @@ th,td{padding:7px 6px;text-align:center;border-bottom:1px solid var(--bd);white-
 th{color:var(--mu);font-weight:600}
 td.l,th.l{text-align:left}
 tr.f td{font-weight:700;color:var(--ac)}
-td.p{font-weight:700}
+td.p,th.p{font-weight:800;color:var(--tx);background:rgba(34,197,94,.14)}
+@media (max-width:420px){table{font-size:14px}th,td{padding:7px 4px}}
 .cy{display:inline-block;width:9px;height:12px;background:var(--yl);border-radius:2px}
 .cr{display:inline-block;width:9px;height:12px;background:var(--rd);border-radius:2px}
 /* açılış ekranı */
@@ -262,9 +263,9 @@ function table(){
   return t.sort(function(a,b){return b.p-a.p||(b.gf-b.ga)-(a.gf-a.ga)||b.gf-a.gf||a.n.localeCompare(b.n,"tr")})}
 function stand(){
   var t=table(),played=S.matches.filter(function(x){return x.d}).length;
-  var h='<div class="card wrap"><table><tr><th>#</th><th class="l">Oyuncu</th><th>O</th><th>G</th><th>B</th><th>M</th><th>AG</th><th>YG</th><th>AV</th><th><span class="cy"></span></th><th><span class="cr"></span></th><th>P</th></tr>';
+  var h='<div class="card wrap"><table><tr><th>#</th><th class="l">Oyuncu</th><th class="p">P</th><th>O</th><th>G</th><th>B</th><th>M</th><th>AG</th><th>YG</th><th>AV</th><th><span class="cy"></span></th><th><span class="cr"></span></th></tr>';
   t.forEach(function(r,i){
-    h+='<tr'+(i===0&&played?' class="f"':"")+"><td>"+(i+1)+'</td><td class="l">'+esc(r.n)+"</td><td>"+r.o+"</td><td>"+r.g+"</td><td>"+r.b+"</td><td>"+r.m+"</td><td>"+r.gf+"</td><td>"+r.ga+"</td><td>"+(r.gf-r.ga)+"</td><td>"+r.y+"</td><td>"+r.k+'</td><td class="p">'+r.p+"</td></tr>"});
+    h+='<tr'+(i===0&&played?' class="f"':"")+"><td>"+(i+1)+'</td><td class="l">'+esc(r.n)+'</td><td class="p">'+r.p+"</td><td>"+r.o+"</td><td>"+r.g+"</td><td>"+r.b+"</td><td>"+r.m+"</td><td>"+r.gf+"</td><td>"+r.ga+"</td><td>"+(r.gf-r.ga)+"</td><td>"+r.y+"</td><td>"+r.k+"</td></tr>"});
   h+='</table></div><div class="mu">O oynanan, G galibiyet, B beraberlik, M mağlubiyet, AG atılan gol, YG yenen gol, AV averaj, P puan. Galibiyet 3, beraberlik 1 puan.</div>';
   return h}
 function render(){
