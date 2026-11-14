@@ -1,0 +1,37 @@
+plugins { id 'com.android.application' }
+
+// Uygulama sayfası (public/) derleme sırasında APK'nın içine kopyalanır.
+def webDir = layout.buildDirectory.dir("generated/webassets")
+def copyWeb = tasks.register("copyWeb", Sync) {
+    from(rootProject.file("../public")) { into "public" }
+    into webDir
+}
+
+android {
+    namespace 'com.sviapp.turnuvafiksturu'
+    compileSdk 35
+    defaultConfig {
+        applicationId 'com.sviapp.turnuvafiksturu'
+        minSdk 24
+        targetSdk 35
+        versionCode((System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInteger())
+        versionName "1.0." + (System.getenv("GITHUB_RUN_NUMBER") ?: "0")
+    }
+    // test.keystore yalnızca telefona elle kurulan test APK'ları içindir (Play Store için ayrı anahtar gerekir)
+    signingConfigs {
+        test {
+            storeFile rootProject.file("test.keystore")
+            storePassword "turnuva-test"
+            keyAlias "turnuva"
+            keyPassword "turnuva-test"
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.test
+        }
+    }
+    sourceSets { main { assets.srcDirs += webDir } }
+}
+tasks.named("preBuild") { dependsOn copyWeb }
