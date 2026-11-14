@@ -71,6 +71,11 @@ td.p,th.p{font-weight:800;color:var(--tx);background:rgba(34,197,94,.14)}
 .btns{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
 .btns button{flex:1;padding:9px 10px;font-size:14px}
 button.d{background:transparent;color:var(--rd);border:1px solid var(--bd)}
+button.w{background:var(--rd);color:#fff;border-color:var(--rd)}
+select{font:inherit;width:100%;padding:10px;border:1px solid var(--bd);border-radius:8px;background:var(--in);color:var(--tx)}
+.vs{display:flex;gap:8px;align-items:center}.vs span{color:var(--mu);font-weight:700}
+.h3{display:flex;text-align:center;margin:12px 0 4px}.h3>div{flex:1}.h3 b{display:block;font:700 30px var(--hf)}.h3 small{color:var(--mu);font-size:13px}
+.ml{display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--bd);font-size:15px}.ml:last-child{border:0}
 .tg{display:inline-block;font-size:12px;font-weight:700;border-radius:6px;padding:2px 7px;background:var(--in);color:var(--mu);margin-right:4px}
 .tg.ok{background:var(--ac2);color:#fff}
 </style></head><body>
@@ -116,7 +121,7 @@ function agg(x){if(S.mode!=="eleme"||S.legs!==2||x.leg!==2||!x.d)return"";var a=
 function rn(i){var v=$("#pn"+i).value.trim();if(v){S.players[i]=v;save()}render()}
 function anyp(){return S.matches.some(function(x){return x.d&&!x.bye})}
 function ap(){var v=$("#pnew").value.trim();if(!v)return;
-  if(S.mode==="eleme"){if(anyp()){S.pe="Eleme başladı, oyuncu eklenemez. Sıfırlayıp yeniden kurabilirsin.";render();return}
+  if(S.mode==="eleme"){if(anyp()){S.pe="Eleme başladı, oyuncu eklenemez. Fikstür sekmesinden Sıfırla\'ya basıp sonra ekleyebilirsin.";render();return}
     S.players.push(v);S.matches=knock(S.players.length);adv()}
   else{var n=S.players.length,r=0;S.matches.forEach(function(x){if(x.r>r)r=x.r});S.players.push(v);
     for(var i=0;i<n;i++){r++;S.matches.push(blank(n,i,r,0,1));if(S.dbl)S.matches.push(blank(i,n,r,0,1))}}
@@ -178,6 +183,19 @@ function sv(i){var x=S.matches[i];
 // iPhone uygulamasında her 5 skor kaydında bir tam ekran reklam (reklam yoksa hiçbir şey yapmaz)
 function reklamSay(){try{if(!window.TFReklam)return;var n=(parseInt(localStorage.getItem("pst1-kayit")||"0",10)||0)+1;localStorage.setItem("pst1-kayit",String(n));if(n%5===0)setTimeout(function(){window.TFReklam.goster()},400)}catch(e){}}
 function ed(i){S.matches[i].d=0;if(S.mode==="eleme")adv();save();render()}
+// iki kez dokunarak onaylama (3,5 sn içinde)
+function cfm(k,fn){if(S.cf!==k){S.cf=k;render();setTimeout(function(){if(S&&S.cf===k){S.cf="";render()}},3500);return}S.cf="";fn()}
+function shuf(a){for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1)),t=a[i];a[i]=a[j];a[j]=t}return a}
+function sig(){return S.matches.filter(function(x){return!x.bye&&x.h>=0&&x.a>=0}).map(function(x){return canon(S.players[x.h])+">"+canon(S.players[x.a])+"@"+x.r}).join("|")}
+function flash(t){S.fl=t;render();setTimeout(function(){if(S&&S.fl===t){S.fl="";render()}},2500)}
+// kurayı yeniden çek: eşleşmeler / hafta sırası / iç saha-deplasman baştan karışır, skorlar silinir
+function redraw(){var f=function(){var old=sig(),n=0;
+    do{shuf(S.players);S.matches=S.mode==="eleme"?knock(S.players.length):gen(S.players.length,S.dbl);if(S.mode==="eleme")adv()}while(sig()===old&&++n<30);
+    S.da=-1;S.ha=0;S.hb=1;save();flash("🔀 Kura yeniden çekildi.")};
+  if(anyp())cfm("rd",f);else{S.cf="";f()}}
+// sıfırla: fikstür aynı kalır, bütün skorlar ve kartlar silinir
+function resetS(){if(!anyp()){flash("Henüz girilmiş skor yok.");return}
+  cfm("rs",function(){S.matches.forEach(function(x){if(x.bye)return;x.d=0;x.hg=x.ag=x.hy=x.hr=x.ay=x.ar=x.ph=x.pa=0});if(S.mode==="eleme")adv();save();flash("↺ Skorlar sıfırlandı.")})}
 function inp(id,v){return'<input id="'+id+'" type="number" inputmode="numeric" min="0" value="'+v+'">'}
 function head(t,back,right){return'<div class="top"><button class="back" onclick="'+(back||"go(\'menu\')")+'">← '+(back?"Geri":"Ana menü")+'</button>'+(right||"")+'</div><h1 style="margin-bottom:6px">'+t+"</h1>"}
 function menu(){
@@ -240,7 +258,8 @@ function hist(){
   ts.slice().reverse().forEach(function(T){var st=statusOf(T);h+='<div class="card"><div class="it"><div><div class="nm">'+esc(T.name)+'</div><div class="mu" style="text-align:left"><span class="tg">'+(T.mode==="eleme"?"Turnuva":"Lig")+'</span><span class="tg">'+(T.legs===2?"Rövanşlı":"Rövanşsız")+"</span>"+day(T.created)+'</div><div style="margin-top:6px">'+(st.done?'<span class="tg ok">🏆 '+esc(st.win)+"</span>":'<span class="tg">Devam ediyor · '+st.d+"/"+st.n+"</span>")+'</div></div><button class="g" onclick="openT(\''+T.id+'\')">Aç</button></div></div>'});
   return h}
 function fix(){
-  var h="",last=0;if(S.mode==="eleme"){var ch=champ();if(ch>=0)h+='<div class="card" style="text-align:center"><div class="sc" style="font-size:34px">🏆 '+esc(S.players[ch])+'</div><div class="mu">Şampiyon</div></div>'}
+  var h='<div class="btns" style="margin:0 0 4px"><button class="'+(S.cf==="rd"?"w":"g")+'" onclick="redraw()">'+(S.cf==="rd"?"Skorlar silinir, emin misin?":"🔀 Kurayı yeniden çek")+'</button><button class="'+(S.cf==="rs"?"w":"d")+'" onclick="resetS()">'+(S.cf==="rs"?"Tüm skorlar silinsin mi?":"↺ Sıfırla")+'</button></div>'
+    +'<div class="mu" style="'+(S.fl?"color:var(--ac);font-weight:600":"")+'">'+(S.fl||"Kura: eşleşmeleri yeniden dağıtır. Sıfırla: fikstür aynı kalır, skorlar silinir.")+"</div>",last=0;if(S.mode==="eleme"){var ch=champ();if(ch>=0)h+='<div class="card" style="text-align:center"><div class="sc" style="font-size:34px">🏆 '+esc(S.players[ch])+'</div><div class="mu">Şampiyon</div></div>'}
   S.matches.forEach(function(x,i){
     if(x.r!==last){last=x.r;h+="<h2>"+(S.mode==="eleme"?rname(x.r):x.r+". Hafta")+"</h2>"}
     if(x.bye){h+='<div class="card mu">'+esc(S.players[x.h])+" bay geçti</div>";return}
@@ -267,7 +286,31 @@ function stand(){
   t.forEach(function(r,i){
     h+='<tr'+(i===0&&played?' class="f"':"")+"><td>"+(i+1)+'</td><td class="l">'+esc(r.n)+'</td><td class="p">'+r.p+"</td><td>"+r.o+"</td><td>"+r.g+"</td><td>"+r.b+"</td><td>"+r.m+"</td><td>"+r.gf+"</td><td>"+r.ga+"</td><td>"+(r.gf-r.ga)+"</td><td>"+r.y+"</td><td>"+r.k+"</td></tr>"});
   h+='</table></div><div class="mu">O oynanan, G galibiyet, B beraberlik, M mağlubiyet, AG atılan gol, YG yenen gol, AV averaj, P puan. Galibiyet 3, beraberlik 1 puan.</div>';
-  return h}
+  return h+h2h()}
+// iki oyuncu arasındaki maçlar (A'nın gözünden): T turnuvasında adları an/bn olanlar
+function pair(T,an,bn){var q={o:0,w:0,d:0,l:0,gf:0,ga:0,y1:0,y2:0,k1:0,k2:0,ms:[]};
+  T.matches.forEach(function(x){if(!x.d||x.bye||x.h<0||x.a<0)return;var h=canon(T.players[x.h]),a=canon(T.players[x.a]),s;
+    if(h===an&&a===bn)s=1;else if(h===bn&&a===an)s=0;else return;
+    var g1=s?x.hg:x.ag,g2=s?x.ag:x.hg;q.o++;q.gf+=g1;q.ga+=g2;q.y1+=s?x.hy:x.ay;q.y2+=s?x.ay:x.hy;q.k1+=s?x.hr:x.ar;q.k2+=s?x.ar:x.hr;
+    if(g1>g2)q.w++;else if(g1<g2)q.l++;else if(T.mode==="eleme"&&(x.ph||x.pa)){((s?x.ph>x.pa:x.pa>x.ph)?q.w++:q.l++)}else q.d++;q.ms.push(x)});
+  return q}
+function hsel(){S.ha=parseInt($("#ha").value,10);S.hb=parseInt($("#hb").value,10);save();render()}
+function hbox(q,A,B){return'<div class="h3"><div><b>'+q.w+'</b><small>'+A+'</small></div><div><b>'+q.d+'</b><small>Beraberlik</small></div><div><b>'+q.l+'</b><small>'+B+'</small></div></div>'
+  +'<div class="mu">'+q.o+" maç · Gol "+q.gf+" - "+q.ga+' · <span class="cy"></span> '+q.y1+"-"+q.y2+' · <span class="cr"></span> '+q.k1+"-"+q.k2+"</div>"}
+function h2h(){var n=S.players.length;if(n<2)return"";
+  var a=S.ha,b=S.hb;if(!(a>=0&&a<n))a=0;if(!(b>=0&&b<n))b=1;if(a===b)b=(a+1)%n;
+  var opt=function(sel){return S.players.map(function(p,i){return'<option value="'+i+'"'+(i===sel?" selected":"")+">"+esc(p)+"</option>"}).join("")};
+  var A=esc(S.players[a]),B=esc(S.players[b]),an=canon(S.players[a]),bn=canon(S.players[b]),q=pair(S,an,bn);
+  var h='<h2>Oyuncular arası</h2><div class="card"><div class="vs"><select id="ha" onchange="hsel()">'+opt(a)+'</select><span>vs</span><select id="hb" onchange="hsel()">'+opt(b)+"</select></div>";
+  h+='<div class="lbl">Bu turnuvada</div>';
+  if(!q.o)h+='<div class="mu" style="text-align:left">Henüz aralarında oynanmış maç yok.</div>';
+  else{h+=hbox(q,A,B)+'<div style="margin-top:8px">';
+    q.ms.forEach(function(x){h+='<div class="ml"><span class="mu" style="margin:0">'+(S.mode==="eleme"?rname(x.r):x.r+". Hafta")+'</span><span><b>'+esc(S.players[x.h])+"</b> "+x.hg+" - "+x.ag+" <b>"+esc(S.players[x.a])+"</b>"+((x.ph||x.pa)?' <span class="mu">(pen. '+x.ph+"-"+x.pa+")</span>":"")+"</span></div>"});h+="</div>"}
+  // kayıtlı bütün turnuvalarda
+  var t={o:0,w:0,d:0,l:0,gf:0,ga:0,y1:0,y2:0,k1:0,k2:0},nt=0;
+  Object.keys(DB.tours).forEach(function(id){var T=DB.tours[id];if(T.id===S.id)T=S;var r=pair(T,an,bn);if(!r.o)return;nt++;["o","w","d","l","gf","ga","y1","y2","k1","k2"].forEach(function(f){t[f]+=r[f]})});
+  if(nt>1||(nt===1&&!q.o))h+='<div class="lbl">Tüm turnuvalarda ('+nt+")</div>"+hbox(t,A,B);
+  return h+"</div>"+(S.mode==="eleme"?'<div class="mu">Berabere biten eleme maçı penaltıyı kazanana yazılır.</div>':"")}
 function render(){
   var h;
   if(V.v==="setup")h=setup();
