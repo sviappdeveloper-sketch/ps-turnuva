@@ -4,7 +4,9 @@ import android.app.Activity;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
+import android.view.WindowInsets;
 import android.webkit.WebResourceRequest;
+import android.widget.FrameLayout;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -35,7 +37,18 @@ public class MainActivity extends Activity {
                 return true;   // dış bağlantılar tarayıcıda açılır
             }
         });
-        setContentView(web);
+        // Android 15+ uygulamayı ekranın kenarına kadar çizer; durum çubuğu ve alt gezinme
+        // çubuğu kadar boşluk bırakılır ki içerik onların altında kalmasın.
+        FrameLayout kok = new FrameLayout(this);
+        kok.setBackgroundColor(getResources().getColor(R.color.bg, getTheme()));
+        kok.addView(web, new FrameLayout.LayoutParams(-1, -1));
+        if (android.os.Build.VERSION.SDK_INT >= 35) kok.setOnApplyWindowInsetsListener((v, ins) -> {
+            int t = WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout() | WindowInsets.Type.ime();
+            android.graphics.Insets i = ins.getInsets(t);
+            v.setPadding(i.left, i.top, i.right, i.bottom);
+            return WindowInsets.CONSUMED;
+        });
+        setContentView(kok);
         if (saved != null) web.restoreState(saved);
         else web.loadUrl("file:///android_asset/public/index.html");
     }

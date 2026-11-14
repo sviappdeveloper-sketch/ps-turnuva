@@ -9,11 +9,11 @@ def copyWeb = tasks.register("copyWeb", Sync) {
 
 android {
     namespace 'com.sviapp.turnuvafiksturu'
-    compileSdk 35
+    compileSdk 36
     defaultConfig {
         applicationId 'com.sviapp.turnuvafiksturu'
         minSdk 24
-        targetSdk 35
+        targetSdk 36
         versionCode((System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInteger())
         versionName "1.0." + (System.getenv("GITHUB_RUN_NUMBER") ?: "0")
     }
@@ -29,7 +29,8 @@ android {
     buildTypes {
         release {
             minifyEnabled false
-            signingConfig signingConfigs.test
+            // Play Store paketi (AAB) imzasız derlenir, yükleme anahtarıyla sonradan imzalanır
+            signingConfig project.hasProperty('imzasiz') ? null : signingConfigs.test
         }
     }
     sourceSets { main { assets.srcDirs += webDir } }

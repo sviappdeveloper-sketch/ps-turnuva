@@ -18,12 +18,15 @@ jobs:
         with: { gradle-version: '8.14.3' }
       - name: APK derle
         working-directory: android
-        run: gradle --no-daemon assembleRelease
+        run: |
+          gradle --no-daemon assembleRelease
+          gradle --no-daemon bundleRelease -Pimzasiz
       - uses: actions/upload-artifact@v4
-        with: { name: turnuva-fiksturu-apk, path: android/app/build/outputs/apk/release/app-release.apk }
+        with: { name: turnuva-fiksturu-apk, path: android/app/build/outputs/ }
       - name: APK'yı "apk" dalına koy
         run: |
           mkdir out && cp android/app/build/outputs/apk/release/app-release.apk out/turnuva-fiksturu.apk
+          cp android/app/build/outputs/bundle/release/app-release.aab out/turnuva-fiksturu-imzasiz.aab
           cd out
           echo "Derleme ${GITHUB_RUN_NUMBER} · ${GITHUB_SHA}" > SURUM.txt
           git init -q -b apk && git add . 
