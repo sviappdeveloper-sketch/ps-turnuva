@@ -5,16 +5,36 @@ import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
 import android.view.WindowInsets;
+import android.os.Handler;
+import android.os.Looper;
+import android.webkit.JavascriptInterface;
 import android.webkit.WebResourceRequest;
+import com.google.android.gms.ads.AdError;
+import com.google.android.gms.ads.AdRequest;
+import com.google.android.gms.ads.FullScreenContentCallback;
+import com.google.android.gms.ads.LoadAdError;
+import com.google.android.gms.ads.MobileAds;
+import com.google.android.gms.ads.interstitial.InterstitialAd;
+import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback;
+import com.google.android.ump.ConsentInformation;
+import com.google.android.ump.ConsentRequestParameters;
+import com.google.android.ump.UserMessagingPlatform;
+import java.util.concurrent.atomic.AtomicBoolean;
 import android.widget.FrameLayout;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
-// Turnuva Fikstürü Android kabuğu: public/index.html telefonun içinden açılır, internet gerekmez.
-// Veriler (turnuvalar, oyuncular) cihazda localStorage'da tutulur.
+// Turnuva Fikstürü Android kabuğu: public/index.html telefonun içinden açılır.
+// Veriler (turnuvalar, oyuncular) cihazda localStorage'da tutulur. İnternet yalnızca reklam içindir:
+// her 5 skor kaydında bir tam ekran AdMob reklamı (sayfa window.TFReklam.goster() çağırır).
 public class MainActivity extends Activity {
     private WebView web;
+    private final Handler main = new Handler(Looper.getMainLooper());
+    private final AtomicBoolean adsStarted = new AtomicBoolean(false);
+    private ConsentInformation consent;
+    private InterstitialAd inter;
+    private boolean interLoading;
 
     @Override
     protected void onCreate(Bundle saved) {
@@ -27,6 +47,7 @@ public class MainActivity extends Activity {
         s.setAllowFileAccess(true);
         s.setTextZoom(100);
         web.setOverScrollMode(WebView.OVER_SCROLL_NEVER);
+        web.addJavascriptInterface(new Reklam(), "TFReklam");
         web.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest r) {
@@ -51,6 +72,48 @@ public class MainActivity extends Activity {
         setContentView(kok);
         if (saved != null) web.restoreState(saved);
         else web.loadUrl("file:///android_asset/public/index.html");
+        setupAds();
+    }
+
+    // AEA/BK kullanıcıları için izin formu (UMP), ardından AdMob başlatılır
+    private void setupAds() {
+        consent = UserMessagingPlatform.getConsentInformation(this);
+        consent.requestConsentInfoUpdate(this, new ConsentRequestParameters.Builder().build(),
+            () -> UserMessagingPlatform.loadAndShowConsentFormIfRequired(this, err -> { if (consent.canRequestAds()) startAds(); }),
+            err -> { if (consent.canRequestAds()) startAds(); });
+        if (consent.canRequestAds()) startAds();
+    }
+
+    private void startAds() {
+        if (!adsStarted.compareAndSet(false, true)) return;
+        new Thread(() -> {
+            MobileAds.initialize(this, st -> {});
+            main.post(this::loadInter);
+        }).start();
+    }
+
+    private void loadInter() {
+        if (!adsStarted.get() || inter != null || interLoading) return;
+        interLoading = true;
+        InterstitialAd.load(this, getString(R.string.ad_interstitial), new AdRequest.Builder().build(), new InterstitialAdLoadCallback() {
+            @Override public void onAdLoaded(InterstitialAd ad) { interLoading = false; inter = ad; }
+            @Override public void onAdFailedToLoad(LoadAdError e) { interLoading = false; inter = null; main.postDelayed(MainActivity.this::loadInter, 30000); }
+        });
+    }
+
+    private void showInterstitial() {
+        final InterstitialAd ad = inter;
+        if (ad == null) { loadInter(); return; }
+        inter = null;
+        ad.setFullScreenContentCallback(new FullScreenContentCallback() {
+            @Override public void onAdDismissedFullScreenContent() { loadInter(); }
+            @Override public void onAdFailedToShowFullScreenContent(AdError e) { loadInter(); }
+        });
+        ad.show(this);
+    }
+
+    private class Reklam {
+        @JavascriptInterface public void goster() { main.post(MainActivity.this::showInterstitial); }
     }
 
     @Override
