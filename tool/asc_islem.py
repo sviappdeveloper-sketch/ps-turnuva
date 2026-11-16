@@ -338,11 +338,31 @@ if GONDER:
     def gonder():
         if not BUILD:
             raise RuntimeError("bağlı derleme yok")
-        sub = call("POST", "/reviewSubmissions", {"data": {"type": "reviewSubmissions", "attributes": {"platform": "IOS"},
-                   "relationships": {"app": {"data": {"type": "apps", "id": APP_ID}}}}})["data"]
-        call("POST", "/reviewSubmissionItems", {"data": {"type": "reviewSubmissionItems",
-             "relationships": {"reviewSubmission": {"data": {"type": "reviewSubmissions", "id": sub["id"]}},
-                               "appStoreVersion": {"data": {"type": "appStoreVersions", "id": SID}}}}})
+        acik = call("GET", f"/reviewSubmissions?filter[app]={APP_ID}&filter[platform]=IOS"
+                           f"&filter[state]=UNRESOLVED_ISSUES,READY_FOR_REVIEW&limit=5")["data"]
+        if acik:
+            sub = acik[0]
+            print("   mevcut gönderim:", sub["attributes"].get("state"))
+        else:
+            sub = call("POST", "/reviewSubmissions", {"data": {"type": "reviewSubmissions", "attributes": {"platform": "IOS"},
+                       "relationships": {"app": {"data": {"type": "apps", "id": APP_ID}}}}})["data"]
+        # Yeni yüklenen ekran görüntüleri Apple'da işlenirken sürüm eklenemez: işlenene kadar bekle
+        for deneme in range(15):
+            try:
+                call("POST", "/reviewSubmissionItems", {"data": {"type": "reviewSubmissionItems",
+                     "relationships": {"reviewSubmission": {"data": {"type": "reviewSubmissions", "id": sub["id"]}},
+                                       "appStoreVersion": {"data": {"type": "appStoreVersions", "id": SID}}}}}, quiet=True)
+                break
+            except urllib.error.HTTPError as e:
+                govde = getattr(e, "body", "") or ""
+                if "already" in govde.lower() or "ITEM_ALREADY" in govde:
+                    break
+                if "IN_POST_PROCESSING" in govde and deneme < 14:
+                    print("   ekran görüntüleri Apple'da işleniyor, 1 dk bekleniyor...")
+                    time.sleep(60)
+                    continue
+                print("HATA", govde[:3000])
+                raise
         call("PATCH", f"/reviewSubmissions/{sub['id']}", {"data": {"type": "reviewSubmissions", "id": sub["id"],
              "attributes": {"submitted": True}}})
         print("   İNCELEMEYE GÖNDERİLDİ. Sonuç 1–3 gün içinde e-postayla gelir.")
