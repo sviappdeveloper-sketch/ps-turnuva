@@ -126,6 +126,16 @@ def uygulama_bilgileri():
 INFO_ID = adim("Uygulama bilgileri", uygulama_bilgileri)
 
 # ---------------------------------------------------------------- 3) sürüm
+# Apple'ın onaylayıp geliştiricinin yayınlamasını beklettiği sürüm varsa önce onu yayınla
+for _bekleyen in call("GET", f"/apps/{APP_ID}/appStoreVersions?filter[platform]=IOS&filter[appStoreState]=PENDING_DEVELOPER_RELEASE&limit=5")["data"]:
+    try:
+        call("POST", "/appStoreVersionReleaseRequests", {"data": {"type": "appStoreVersionReleaseRequests",
+             "relationships": {"appStoreVersion": {"data": {"type": "appStoreVersions", "id": _bekleyen["id"]}}}}})
+        print("Onaylı sürüm yayınlandı:", _bekleyen["attributes"]["versionString"])
+        time.sleep(20)
+    except urllib.error.HTTPError:
+        eksikler.append("Onaylı sürüm yayınlanamadı: App Store Connect'te 'Bu sürümü yayınla' düğmesine bas.")
+
 cfg = open(os.path.join(ROOT, "ios", "Config.xcconfig"), encoding="utf-8").read()
 VER = re.search(r"^MARKETING_VERSION\s*=\s*(\S+)", cfg, re.M).group(1)
 DUZENLENEBILIR = "PREPARE_FOR_SUBMISSION,DEVELOPER_REJECTED,REJECTED,METADATA_REJECTED,INVALID_BINARY"
@@ -162,6 +172,13 @@ def surum_metinleri():
                  "attributes": {"locale": LOC, **attrs},
                  "relationships": {"appStoreVersion": {"data": {"type": "appStoreVersions", "id": SID}}}}})["data"]
     print("   açıklama, anahtar kelimeler, tanıtım metni, destek adresi yazıldı")
+    if META.get("whatsNew"):
+        try:
+            call("PATCH", f"/appStoreVersionLocalizations/{l['id']}", {"data": {"type": "appStoreVersionLocalizations",
+                 "id": l["id"], "attributes": {"whatsNew": META["whatsNew"]}}}, quiet=True)
+            print("   'Bu sürümdeki yenilikler' yazıldı")
+        except urllib.error.HTTPError:
+            pass   # ilk sürümde bu alan yok
     return l["id"]
 
 
