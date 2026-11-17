@@ -9,7 +9,8 @@ ios/             ← iPhone kabuğu (XcodeGen: project.yml, Config.xcconfig)
 site/            ← gizlilik / destek sayfaları (GitHub Pages)
 app-store/       ← mağaza metinleri (metadata.json) ve ekran görüntüleri
 tool/            ← imza ve App Store Connect betikleri (Codemagic çalıştırır)
-codemagic.yaml   ← derleme, yükleme, mağaza sayfası, incelemeye gönderme
+codemagic.yaml   ← derleme, yükleme, mağaza sayfası, incelemeye gönderme (Codemagic)
+.github/workflows/appstore.yml ← aynısı GitHub Actions ile (ücretsiz; secret: ASC_KEY_P8, elle başlatılır)
 ```
 
 ## App Store'a yükleme

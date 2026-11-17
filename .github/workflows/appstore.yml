@@ -1,0 +1,90 @@
+name: App Store (iPhone)
+# iPhone sürümünü derler, imzalar, App Store Connect'e yükler; mağaza sayfasını hazırlar
+# ve istenirse Apple incelemesine gönderir. (Codemagic'in yerine; depo herkese açık olduğu için ücretsiz.)
+# Gerekli tek gizli değer: Settings → Secrets and variables → Actions → ASC_KEY_P8
+# (App Store Connect API anahtarı .p8 dosyasının tamamı, BEGIN/END satırları dahil).
+on:
+  workflow_dispatch:
+    inputs:
+      gonder:
+        description: "Apple incelemesine gönder"
+        type: boolean
+        default: true
+concurrency: { group: appstore, cancel-in-progress: false }
+jobs:
+  ios:
+    runs-on: macos-15
+    timeout-minutes: 120
+    env:
+      ASC_KEY_ID: 9PJ9V3965R
+      ASC_ISSUER_ID: 195bfec6-edd0-4a8e-8cd8-6a1d5d51bb6e
+      APPLE_TEAM_ID: GS55JS3WKJ
+      P12_PASS: turnuva-ci-gecici
+      ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Gizli anahtar var mı
+        run: |
+          if [ -z "$ASC_KEY_P8" ]; then
+            echo "::error::ASC_KEY_P8 secret'ı yok. GitHub → Settings → Secrets and variables → Actions → New repository secret: ad ASC_KEY_P8, değer .p8 dosyasının tamamı."
+            exit 1
+          fi
+      - name: Araçlar
+        run: |
+          brew install xcodegen
+          pip3 install --quiet --break-system-packages pyjwt cryptography || pip3 install --quiet pyjwt cryptography
+      - name: Sertifika, profil, paket kimliği
+        run: python3 tool/ios_signing.py
+      - name: Anahtar zinciri ve profil
+        run: |
+          KC=$RUNNER_TEMP/imza.keychain-db
+          security create-keychain -p gecici "$KC"
+          security set-keychain-settings -lut 21600 "$KC"
+          security unlock-keychain -p gecici "$KC"
+          security import $RUNNER_TEMP/dagitim.p12 -P "$P12_PASS" -A -t cert -f pkcs12 -k "$KC"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k gecici "$KC" >/dev/null
+          security list-keychains -d user -s "$KC" $(security list-keychains -d user | tr -d '"')
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          cp $RUNNER_TEMP/profil.mobileprovision "$HOME/Library/MobileDevice/Provisioning Profiles/$PROFILE_UUID.mobileprovision"
+      - name: Xcode projesi (elle imza) ve derleme numarası
+        run: |
+          N=$(date -u +%Y%m%d%H%M)
+          echo "Derleme numarası: $N"
+          sed -i '' "s/^CURRENT_PROJECT_VERSION = .*/CURRENT_PROJECT_VERSION = $N/" ios/Config.xcconfig
+          perl -0pi -e 's/        CODE_SIGN_STYLE: Automatic/        CODE_SIGN_STYLE: Manual\n        CODE_SIGN_IDENTITY: Apple Distribution\n        PROVISIONING_PROFILE_SPECIFIER: "$ENV{PROFILE_NAME}"/' ios/project.yml
+          grep -n "CODE_SIGN\|PROVISIONING" ios/project.yml
+          cd ios && xcodegen generate
+      - name: Arşiv ve IPA
+        working-directory: ios
+        run: |
+          set -o pipefail
+          xcodebuild -project TurnuvaFiksturu.xcodeproj -scheme TurnuvaFiksturu -configuration Release \
+            -destination 'generic/platform=iOS' -archivePath $RUNNER_TEMP/tf.xcarchive archive | tail -n 60
+          cat > $RUNNER_TEMP/export.plist <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>teamID</key><string>$APPLE_TEAM_ID</string>
+            <key>signingStyle</key><string>manual</string>
+            <key>provisioningProfiles</key><dict><key>com.sviapp.turnuvafiksturu</key><string>$PROFILE_NAME</string></dict>
+            <key>uploadSymbols</key><true/>
+          </dict></plist>
+          EOF
+          xcodebuild -exportArchive -archivePath $RUNNER_TEMP/tf.xcarchive -exportPath $RUNNER_TEMP/ipa \
+            -exportOptionsPlist $RUNNER_TEMP/export.plist | tail -n 30
+          ls -la $RUNNER_TEMP/ipa
+      - name: App Store Connect'e yükle
+        run: |
+          mkdir -p ~/private_keys
+          printf '%s\n' "$ASC_KEY_P8" > ~/private_keys/AuthKey_$ASC_KEY_ID.p8
+          xcrun altool --upload-app -f $RUNNER_TEMP/ipa/*.ipa -t ios --apiKey $ASC_KEY_ID --apiIssuer $ASC_ISSUER_ID
+      - name: Mağaza sayfası, derlemeyi bağla${{ inputs.gonder && ', incelemeye gönder' || '' }}
+        env:
+          GONDER: ${{ inputs.gonder && 'evet' || '' }}
+        run: python3 tool/asc_islem.py
+      - name: Temizlik
+        if: always()
+        run: |
+          rm -f ~/private_keys/AuthKey_*.p8
+          security delete-keychain $RUNNER_TEMP/imza.keychain-db 2>/dev/null || true
