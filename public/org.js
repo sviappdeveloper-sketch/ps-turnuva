@@ -5,7 +5,7 @@
 // Herkese açık organizasyonları herkes görür; kapalı olanlar için kod + izleme şifresi gerekir.
 // Firestore kuralları: depo kökündeki firestore.rules
 // =====================================================================
-var FB={apiKey:"",projectId:""};   // Firebase → Proje ayarları → Web uygulaması (apiKey, projectId)
+var FB={apiKey:"AIzaSyBH9GhNhHbjmjps5FySin10vAgWlifxVR8",projectId:"turnuva-fiksturu"};   // Firebase → Proje ayarları → Web uygulaması (apiKey, projectId)
 var O=null,OM={},OPOLL=null;        // O: açık organizasyon, OM: id, rol, sunucu sürümü (ut), sahibi
 DB.orgs=DB.orgs||{};
 var FIX=["id","org","ro","cf","fl","tab","da","pe","ha","hb"];
