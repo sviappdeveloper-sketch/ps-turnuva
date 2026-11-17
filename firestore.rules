@@ -4,6 +4,7 @@ rules_version = '2';
 // orgs/{kod}/eds/{uid}  : yönetici şifresini girenler (p=şifre, n=ad)
 // orgs/{kod}/vw/{uid}   : kapalı organizasyonu izleme şifresiyle açanlar
 // sec/{kod}             : şifreler (e=yönetici, v=izleme), yalnızca kurucu okur
+// reports/{kod}_{uid}   : uygunsuz içerik bildirimleri (yalnızca yazılır, geliştirici konsoldan okur)
 service cloud.firestore {
   match /databases/{db}/documents {
     function signed() { return request.auth != null; }
@@ -35,6 +36,12 @@ service cloud.firestore {
         allow create: if signed() && request.auth.uid == uid
           && (request.resource.data.p == secOf(id).v || request.resource.data.p == secOf(id).e);
       }
+    }
+    match /reports/{id} {
+      allow create, update: if signed() && request.resource.data.uid == request.auth.uid
+        && id == request.resource.data.org + '_' + request.auth.uid
+        && request.resource.data.keys().hasOnly(['org', 'uid', 'name', 't'])
+        && request.resource.data.name is string && request.resource.data.name.size() <= 80;
     }
     match /sec/{id} {
       allow get, update, delete: if isOwner(id);

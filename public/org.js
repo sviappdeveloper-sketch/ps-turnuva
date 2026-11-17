@@ -7,7 +7,7 @@
 // =====================================================================
 var FB={apiKey:"AIzaSyBH9GhNhHbjmjps5FySin10vAgWlifxVR8",projectId:"turnuva-fiksturu"};   // Firebase → Proje ayarları → Web uygulaması (apiKey, projectId)
 var O=null,OM={},OPOLL=null;        // O: açık organizasyon, OM: id, rol, sunucu sürümü (ut), sahibi
-DB.orgs=DB.orgs||{};
+DB.orgs=DB.orgs||{};DB.hid=DB.hid||{};   // hid: bu cihazda gizlenen (ya da bildirilen) açık organizasyonlar
 var FIX=["id","org","ro","cf","fl","tab","da","pe","ha","hb"];
 function fbOk(){return!!(FB.apiKey&&FB.projectId)}
 function DOCS(){return"https://firestore.googleapis.com/v1/projects/"+FB.projectId+"/databases/(default)/documents"}
@@ -25,6 +25,22 @@ function code(n){var A="ABCDEFGHJKLMNPQRSTUVWXYZ23456789",s="",r=new Uint32Array
 function pin(){return String(100000+Math.floor(Math.random()*900000))}
 function errTx(e){if(!e)return"Bilinmeyen hata";if(e.st===403||e.code==="PERMISSION_DENIED")return"İzin yok (şifre yanlış olabilir).";if(e.st===404)return"Bulunamadı.";if(e.code==="FAILED_PRECONDITION"||e.code==="ABORTED")return"Bu arada başka bir yönetici değişiklik yaptı.";if(e instanceof TypeError||e.message==="Failed to fetch")return"İnternet bağlantısı yok.";return e.msg||String(e)}
 function cleanJSON(o){return JSON.stringify(o,function(k,v){return FIX.indexOf(k)>=0?undefined:v})}
+// uygunsuz ad süzgeci (organizasyon ve takım adları herkese görünebilir)
+var KOTU_K=["amk","amq","aq","oç","piç","göt","sik","ibne","sex","seks","shit"];
+var KOTU_U=["orospu","yarrak","yarak","amcık","amcik","amına","amina","siktir","sikiş","sikis","sikerim","sikeyim","pezevenk","kahpe","yavşak","gavat","fuck","bitch","nigger","nigga","pussy","whore","porno","cunt","faggot"];
+function kotu(s){var t=String(s||"").toLocaleLowerCase("tr").replace(/[0@4]/g,function(c){return{"0":"o","@":"a","4":"a"}[c]}).replace(/1/g,"i").replace(/3/g,"e");
+  return t.split(/[^a-zçğıöşü]+/).some(function(w){return w&&(KOTU_K.indexOf(w)>=0||KOTU_U.some(function(k){return w.indexOf(k)>=0}))})}
+var KOTU_TX="Uygunsuz bir kelime var, lütfen değiştir.";
+var OMSG="";
+// açık listede bir organizasyonu bu cihazda gizle / uygunsuz diye bildir
+function orgHide(id){DB.hid[id]=1;store();if(V.pubs&&V.pubs.filter)V.pubs=V.pubs.filter(function(p){return p.id!==id});
+  OMSG="Organizasyon gizlendi; artık listende görünmeyecek.";if(V.v==="orgv")go("org");else render()}
+function orgReport(id,name){if(V.rp!==id){V.rp=id;render();setTimeout(function(){if(V.rp===id){V.rp=null;render()}},3500);return}V.rp=null;
+  auth().then(function(a){return api("PATCH","/reports/"+id+"_"+a.uid,{fields:fv({org:id,uid:a.uid,name:String(name||"").slice(0,80),t:Date.now()})})})
+  .then(function(){DB.hid[id]=1;store();if(V.pubs&&V.pubs.filter)V.pubs=V.pubs.filter(function(p){return p.id!==id});
+    OMSG="Bildirdin, teşekkürler. İnceleyip uygunsuzsa 24 saat içinde kaldıracağız. Bu organizasyon artık listende görünmeyecek.";if(V.v==="orgv")go("org");else render()},
+    function(e){if(V.v==="orgv")V.oerr=errTx(e);else OMSG=errTx(e);render()})}
+function orgUnhide(){DB.hid={};store();OMSG="";V.pubs=null;V.pl=0;render()}
 function remember(id,x){var r=DB.orgs[id]||{};for(var k in x)r[k]=x[k];r.used=Date.now();DB.orgs[id]=r;store()}
 
 // ---------------- organizasyon motoru ----------------
@@ -89,6 +105,7 @@ function noServer(){return'<div class="card"><b>Sunucu bağlantısı henüz ayar
 function orgHome(){var h=head("Organizasyon");
   h+='<div class="mu" style="text-align:left;margin-bottom:12px">Takımlar kurayla gruplara ayrılır, gruplardan çıkanlar eleme turlarında oynar (eski Şampiyonlar Ligi usulü). Yönetici şifresini verdiğin kişiler de skor girebilir.</div>';
   if(!fbOk())return h+noServer();
+  if(OMSG)h+='<div class="card" style="text-align:left">'+esc(OMSG)+' <button class="g" onclick="OMSG=\'\';render()">Tamam</button></div>';
   h+='<button class="big" onclick="orgNew()"><span class="ic">➕</span><span>Yeni organizasyon<small>Takımlar, grup sayısı, eleme ve final ayarları</small></span></button>';
   h+='<div class="card"><div class="lbl" style="margin-top:0">Kodla aç</div><div class="row"><input type="text" id="oc" placeholder="Örn. K7M2QX" autocapitalize="characters" style="text-transform:uppercase" value="'+esc(V.oc||"")+'" oninput="V.oc=this.value" onkeydown="if(event.key===\'Enter\')orgOpen(this.value)"><button onclick="orgOpen(V.oc)">Aç</button></div></div>';
   var my=Object.keys(DB.orgs).sort(function(a,b){return(DB.orgs[b].used||0)-(DB.orgs[a].used||0)});
@@ -99,7 +116,11 @@ function orgHome(){var h=head("Organizasyon");
   if(!V.pubs){if(!V.pl){V.pl=1;orgPubs()}h+='<div class="card mu">Yükleniyor…</div>'}
   else if(V.pubs.err)h+='<div class="card mu">'+esc(V.pubs.err)+' <button class="g" onclick="V.pubs=null;V.pl=0;render()">Tekrar dene</button></div>';
   else if(!V.pubs.length)h+='<div class="card mu">Henüz herkese açık organizasyon yok.</div>';
-  else V.pubs.forEach(function(p){h+='<div class="card"><div class="it"><div><div class="nm">'+esc(p.name)+'</div><div class="mu" style="text-align:left">'+day(p.upd)+" · Kod: <b>"+p.id+'</b></div></div><button onclick="orgOpen(\''+p.id+'\')">Aç</button></div></div>'});
+  else V.pubs.forEach(function(p){if(DB.hid[p.id])return;h+='<div class="card"><div class="it"><div><div class="nm">'+esc(p.name)+'</div><div class="mu" style="text-align:left">'+day(p.upd)+" · Kod: <b>"+p.id+'</b></div></div><button onclick="orgOpen(\''+p.id+'\')">Aç</button></div>'
+    +'<div class="btns"><button class="g" onclick="orgHide(\''+p.id+'\')">🙈 Gizle</button><button class="'+(V.rp===p.id?"w":"d")+'" onclick="orgReport(\''+p.id+'\','+esc(JSON.stringify(p.name))+')">'+(V.rp===p.id?"Uygunsuz diye bildirilsin mi?":"🚩 Bildir")+"</button></div></div>"});
+  var nh=Object.keys(DB.hid).length;
+  if(nh)h+='<div class="mu" style="text-align:left">'+nh+' organizasyonu gizledin. <button class="g" onclick="orgUnhide()">Gizlenenleri göster</button></div>';
+  h+='<div class="mu" style="text-align:left">Uygunsuz ad ya da içerik görürsen 🚩 Bildir\'e dokun; incelenir ve 24 saat içinde kaldırılır.</div>';
   return h}
 function orgForget(id){if(V.fg!==id){V.fg=id;render();setTimeout(function(){if(V.fg===id){V.fg=null;render()}},3500);return}delete DB.orgs[id];V.fg=null;store();render()}
 function orgPubs(){api("POST",":runQuery",{structuredQuery:{from:[{collectionId:"orgs"}],where:{fieldFilter:{field:{fieldPath:"pub"},op:"EQUAL",value:{booleanValue:true}}},limit:100}})
@@ -110,7 +131,7 @@ function orgPubs(){api("POST",":runQuery",{structuredQuery:{from:[{collectionId:
 function orgNew(){V={v:"orgnew",name:"",teams:[],ng:2,adv:2,gl:2,kl:2,fs:true,pub:true,man:false,ep:pin(),vp:pin(),err:""};render()}
 function onm(){var e=$("#tn");if(e)V.name=e.value;e=$("#ep");if(e)V.ep=e.value;e=$("#vp");if(e)V.vp=e.value}
 function oset(k,v){onm();V[k]=v;render()}
-function oadd(){onm();var e=$("#nm"),v=e.value.trim();if(!v)return;if(V.teams.some(function(p){return canon(p)===canon(v)})){V.err="Bu takım zaten listede.";render();return}V.teams.push(v);V.err="";render();$("#nm").focus()}
+function oadd(){onm();var e=$("#nm"),v=e.value.trim();if(!v)return;if(kotu(v)){V.err=KOTU_TX;render();return}if(V.teams.some(function(p){return canon(p)===canon(v)})){V.err="Bu takım zaten listede.";render();return}V.teams.push(v);V.err="";render();$("#nm").focus()}
 function odel(i){onm();V.teams.splice(i,1);render()}
 function opick(i){onm();V.teams=DB.lists[i].players.slice();render()}
 function seg(k,opts){return'<div class="seg">'+opts.map(function(o){return'<button class="'+(V[k]===o[0]?"on":"")+'" onclick="oset(\''+k+'\','+JSON.stringify(o[0])+')">'+o[1]+"</button>"}).join("")+"</div>"}
@@ -136,10 +157,11 @@ function orgNewV(){var h=head("Yeni organizasyon","go(\'org\')");
   h+='</div><div class="mu" style="text-align:left">'+esc(orgPlan())+'</div><div class="mu" style="color:var(--rd)">'+esc(V.err||"")+"</div></div>";
   if(DB.lists.length){h+='<div class="card"><div class="lbl" style="margin-top:0">Kayıtlı listeden seç</div>';
     DB.lists.forEach(function(L,i){h+='<span class="chip s" onclick="opick('+i+')">'+esc(L.name)+' <span class="mu">('+L.players.length+")</span></span>"});h+="</div>"}
+  h+='<div class="mu" style="text-align:left">Organizasyon kurarak küfür, hakaret ya da uygunsuz içerik paylaşmayacağını kabul edersin. Bildirilen uygunsuz içerik 24 saat içinde kaldırılır ve paylaşanın erişimi engellenebilir.</div>';
   h+='<button style="width:100%;padding:14px" '+(V.busy?"disabled":"")+' onclick="orgCreate()">'+(V.busy||(V.man?"Organizasyonu kur ve grupları diz":"Kurayı çek ve organizasyonu başlat"))+"</button>";
   return h}
 function orgCreate(){onm();var n=V.teams.length;
-  var e=!V.name.trim()?"Organizasyona bir ad ver.":n<V.ng*2?V.ng+" grup için en az "+V.ng*2+" takım gerekir.":Math.floor(n/V.ng)<=V.adv&&V.ng>1?"Her grupta çıkan takım sayısından fazla takım olmalı; takım ekle ya da grup sayısını azalt.":V.ng===1&&n<=V.adv?"En az "+(V.adv+1)+" takım gerekir.":!/^\S{4,}$/.test(V.ep)?"Yönetici şifresi en az 4 karakter olmalı.":!V.pub&&!/^\S{4,}$/.test(V.vp)?"İzleme şifresi en az 4 karakter olmalı.":"";
+  var e=!V.name.trim()?"Organizasyona bir ad ver.":kotu(V.name)||V.teams.some(kotu)?KOTU_TX:n<V.ng*2?V.ng+" grup için en az "+V.ng*2+" takım gerekir.":Math.floor(n/V.ng)<=V.adv&&V.ng>1?"Her grupta çıkan takım sayısından fazla takım olmalı; takım ekle ya da grup sayısını azalt.":V.ng===1&&n<=V.adv?"En az "+(V.adv+1)+" takım gerekir.":!/^\S{4,}$/.test(V.ep)?"Yönetici şifresi en az 4 karakter olmalı.":!V.pub&&!/^\S{4,}$/.test(V.vp)?"İzleme şifresi en az 4 karakter olmalı.":"";
   if(e){V.err=e;render();return}
   var o={v:1,teams:V.teams.slice(),ng:V.ng,adv:V.adv,gl:V.gl,kl:V.kl,fs:!!V.fs,created:Date.now(),updated:Date.now()};orgBuild(o);
   var id=code(6),pw=V.ep,vp=V.pub?pw:V.vp;V.busy="Kuruluyor…";V.err="";render();addList(V.teams);
@@ -206,9 +228,10 @@ function orgPng(k){var sub=O.name&&OM.id?"Kod "+OM.id:"";
 function orgInfo(ce){if(V.ge&&ce)return geView();var h='<div class="card"><div class="lbl" style="margin-top:0">Düzen</div><div style="text-align:left">'
   +O.groups.length+" grup ("+O.groups.map(function(g){return g.n}).join(", ")+"), her gruptan "+O.adv+" takım çıkar. Grup maçları "+(O.gl===2?"rövanşlı":"tek maç")+", eleme turları "+(O.kl===2?"rövanşlı":"tek maç")+(O.fs?", final tek maç":"")+".</div>";
   h+='<div class="lbl">Paylaş</div><div style="text-align:left">Arkadaşların uygulamada <b>Organizasyon → Kodla aç</b> bölümüne <b style="font-size:20px;letter-spacing:2px">'+OM.id+"</b> yazarak "+(O.pub?"izleyebilir.":"ve izleme şifresiyle görebilir.")+"</div></div>";
-  if(!ce){h+='<div class="card"><div class="lbl" style="margin-top:0">Düzenleme yetkisi</div><div class="mu" style="text-align:left">Skor girmek için kurucudan yönetici şifresini iste.</div><button style="width:100%;margin-top:8px" onclick="V={v:\'orgjoin\',code:\''+OM.id+'\'};render()">✏️ Yönetici şifresini gir</button></div>';return h}
+  if(!ce){h+='<div class="card"><div class="lbl" style="margin-top:0">Düzenleme yetkisi</div><div class="mu" style="text-align:left">Skor girmek için kurucudan yönetici şifresini iste.</div><button style="width:100%;margin-top:8px" onclick="V={v:\'orgjoin\',code:\''+OM.id+'\'};render()">✏️ Yönetici şifresini gir</button></div>';
+    return h+orgFlag()}
   h+='<div class="card"><div class="lbl" style="margin-top:0">Fikstür</div><div class="btns"><button class="'+(V.ocf==="rd"?"w":"g")+'" onclick="orgRedraw()">'+(V.ocf==="rd"?"Bütün skorlar silinir, emin misin?":"🔀 Grup kurasını yeniden çek")+'</button><button class="'+(V.ocf==="rs"?"w":"d")+'" onclick="orgReset()">'+(V.ocf==="rs"?"Bütün skorlar silinsin mi?":"↺ Sıfırla")+'</button></div><button class="g" style="width:100%;margin-top:6px" onclick="geStart()">✋ Grupları elle düzenle / takım adlarını düzelt</button><div class="mu" style="text-align:left">Kura takımları gruplara yeniden dağıtır. Sıfırla gruplar aynı kalarak bütün skorları siler.</div></div>';
-  if(OM.role!=="owner")return h+'<div class="mu">Şifreleri, görünürlüğü ve yöneticileri kurucu yönetir.</div>';
+  if(OM.role!=="owner")return h+'<div class="mu">Şifreleri, görünürlüğü ve yöneticileri kurucu yönetir.</div>'+orgFlag();
   // kurucu
   if(!V.sec&&!V.secl){V.secl=1;api("GET","/sec/"+OM.id).then(function(d){V.sec=fr(d.fields);render()},function(e){V.sec={err:errTx(e)};render()});
     api("GET","/orgs/"+OM.id+"/eds",null,"pageSize=100").then(function(r){V.eds=(r.documents||[]).map(function(d){var f=fr(d.fields);return{uid:d.name.split("/").pop(),n:f.n||"İsimsiz",t:f.t||0}});render()},function(){V.eds=[];render()})}
@@ -224,12 +247,13 @@ function orgInfo(ce){if(V.ge&&ce)return geView();var h='<div class="card"><div c
   else V.eds.forEach(function(e,i){h+='<div class="it" style="margin:6px 0"><span><b>'+esc(e.n)+'</b> <span class="mu" style="margin:0">'+(e.t?day(e.t):"")+'</span></span><button class="d" onclick="orgKick('+i+')">'+(V.kk===i?"Emin misin?":"Yetkiyi al")+"</button></div>"});
   h+='<div class="lbl">Organizasyonu sil</div><button class="'+(V.ocf==="del"?"w":"d")+'" style="width:100%" onclick="orgDel()">'+(V.ocf==="del"?"Herkes için silinsin mi? Geri alınamaz.":"🗑 Organizasyonu sil")+"</button></div>";
   return h}
+function orgFlag(){return'<div class="card"><div class="lbl" style="margin-top:0">Uygunsuz içerik</div><div class="mu" style="text-align:left">Bu organizasyonda küfür, hakaret ya da uygunsuz bir ad varsa bildir; incelenir ve 24 saat içinde kaldırılır.</div><div class="btns"><button class="g" onclick="orgHide(\''+OM.id+'\')">🙈 Gizle</button><button class="'+(V.rp===OM.id?"w":"d")+'" onclick="orgReport(\''+OM.id+'\','+esc(JSON.stringify(O.name))+')">'+(V.rp===OM.id?"Uygunsuz diye bildirilsin mi?":"🚩 Bildir")+"</button></div></div>"}
 function ocfm(k,fn){if(V.ocf!==k){V.ocf=k;render();setTimeout(function(){if(V.ocf===k){V.ocf="";render()}},3500);return}V.ocf="";fn()}
 function anyOrgPlayed(){return orgCounts(O).d>0}
 function orgRedraw(){var f=function(){orgBuild(O);V.g=0;orgSave();render()};if(anyOrgPlayed())ocfm("rd",f);else f()}
 function orgReset(){if(!anyOrgPlayed()){V.oerr="Henüz girilmiş skor yok.";render();return}
   ocfm("rs",function(){O.groups.forEach(function(g){g.matches.forEach(function(x){x.d=0;x.hg=x.ag=x.hy=x.hr=x.ay=x.ar=0})});O.ko=null;orgSave();render()})}
-function orgName(){var v=$("#on").value.trim();if(!v)return;O.name=v;orgSave();render()}
+function orgName(){var v=$("#on").value.trim();if(!v)return;if(kotu(v)){V.oerr=KOTU_TX;render();return}O.name=v;orgSave();render()}
 function orgPub(p){if(O.pub===p)return;var old=O.pub;O.pub=p;render();
   var q="updateMask.fieldPaths=pub&currentDocument.updateTime="+encodeURIComponent(OM.ut);
   api("PATCH","/orgs/"+OM.id,{fields:fv({pub:p})},q).then(function(d){OM.ut=d.updateTime;remember(OM.id,{pub:p});
@@ -257,7 +281,7 @@ function geView(){var h='<div class="card"><div class="lbl" style="margin-top:0"
   h+='<div class="mu" style="color:var(--rd);text-align:left">'+esc(V.gerr||"")+'</div><div class="btns"><button class="g" onclick="V.ge=null;render()">Vazgeç</button><button class="'+(V.ocf==="ge"?"w":"")+'" onclick="geSave()">'+(V.ocf==="ge"?"Değişen grupların skorları silinir, emin misin?":"Kaydet")+"</button></div>";
   return h}
 function geSave(){geSync();var names={},e="";
-  V.ge.forEach(function(t){t.n=t.n.trim();if(!t.n)e="Takım adı boş olamaz.";else if(names[canon(t.n)])e="Aynı ad iki kez var: "+t.n;names[canon(t.n)]=1});
+  V.ge.forEach(function(t){t.n=t.n.trim();if(!t.n)e="Takım adı boş olamaz.";else if(kotu(t.n))e=KOTU_TX;else if(names[canon(t.n)])e="Aynı ad iki kez var: "+t.n;names[canon(t.n)]=1});
   O.groups.forEach(function(G,gi){var m=V.ge.filter(function(t){return t.g===gi}).length;if(m<2)e=e||G.n+" Grubunda en az 2 takım olmalı.";else if(O.groups.length>1&&m<=O.adv)e=e||G.n+" Grubunda "+(O.adv+1)+" takımdan az olamaz (her gruptan "+O.adv+" takım çıkıyor)."});
   if(e){V.gerr=e;V.ocf="";render();return}
   // üyeleri değişen gruplar (sıra önemsiz, adlar eski haliyle karşılaştırılır)

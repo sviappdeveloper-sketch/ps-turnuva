@@ -216,7 +216,7 @@ if VLOC:
 
 
 # ---------------------------------------------------------------- 6) yaş derecelendirmesi
-YENI_SORULAR = {"advertising": True, "userGeneratedContent": False, "messagingAndChat": False, "parentalControls": False,
+YENI_SORULAR = {"advertising": True, "userGeneratedContent": True, "messagingAndChat": False, "parentalControls": False,
                 "ageAssurance": False, "healthOrWellnessTopics": False, "lootBox": False, "gunsOrOtherWeapons": "NONE"}
 
 
