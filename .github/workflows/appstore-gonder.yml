@@ -1,0 +1,24 @@
+name: App Store - incelemeye gönder
+# Derleme zaten yüklüyse: mağaza sayfasını yeniden yazar, derlemeyi sürüme bağlar ve Apple incelemesine gönderir.
+# (Mac gerekmez, birkaç dakika sürer.) Gizli değer: ASC_KEY_P8
+on:
+  workflow_dispatch:
+    inputs:
+      gonder:
+        description: "Apple incelemesine gönder"
+        type: boolean
+        default: true
+concurrency: { group: appstore, cancel-in-progress: false }
+jobs:
+  asc:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      ASC_KEY_ID: 9PJ9V3965R
+      ASC_ISSUER_ID: 195bfec6-edd0-4a8e-8cd8-6a1d5d51bb6e
+      ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+      GONDER: ${{ inputs.gonder && 'evet' || '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip3 install --quiet pyjwt cryptography
+      - run: python3 tool/asc_islem.py

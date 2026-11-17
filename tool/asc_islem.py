@@ -296,8 +296,13 @@ def derleme():
         builds = call("GET", f"/builds?filter[app]={APP_ID}&filter[preReleaseVersion.version]={VER}"
                              f"&filter[preReleaseVersion.platform]=IOS&sort=-uploadedDate&limit=5")["data"]
         if not builds:
-            eksikler.append(f"{VER} sürümü için yüklenmiş derleme yok: önce 'iOS TestFlight' işlemini çalıştır (main'e gönderim).")
-            return None
+            # yeni yüklenen derleme Apple'da birkaç dakika sonra listelenir: süre dolana kadar bekle
+            if time.time() > deadline:
+                eksikler.append(f"{VER} sürümü için yüklenmiş derleme yok: önce derleyip yükle ('App Store (iPhone)' işlemi).")
+                return None
+            print("   derleme henüz görünmüyor, 1 dk bekleniyor...")
+            time.sleep(60)
+            continue
         son = builds[0]
         a = son["attributes"]
         print(f"   derleme {a['version']}: {a['processingState']}")
