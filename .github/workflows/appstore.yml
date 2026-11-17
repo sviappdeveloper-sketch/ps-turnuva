@@ -29,6 +29,13 @@ jobs:
             echo "::error::ASC_KEY_P8 secret'ı yok. GitHub → Settings → Secrets and variables → Actions → New repository secret: ad ASC_KEY_P8, değer .p8 dosyasının tamamı."
             exit 1
           fi
+      - name: Xcode 26 seç (App Store en az iOS 26 SDK istiyor)
+        run: |
+          ls -d /Applications/Xcode*.app
+          X=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | grep -v -i beta | sort -V | tail -1)
+          [ -n "$X" ] || { echo "::error::Bu çalıştırıcıda Xcode 26 yok"; exit 1; }
+          sudo xcode-select -s "$X/Contents/Developer"
+          xcodebuild -version
       - name: Araçlar
         run: |
           brew install xcodegen
