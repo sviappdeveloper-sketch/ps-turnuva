@@ -8,6 +8,13 @@
         android:label="Turnuva Fikstürü"
         android:theme="@style/AppTheme">
         <meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" android:value="@string/admob_app_id" />
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.paylas"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/paylas_yollari" />
+        </provider>
         <activity
             android:name=".MainActivity"
             android:exported="true"

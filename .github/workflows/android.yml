@@ -2,7 +2,7 @@ name: Android APK
 # Telefona elle kurulabilen APK üretir ve "apk" dalına koyar (turnuva-fiksturu.apk).
 on:
   push:
-    branches: [main, android]
+    branches: [main, android, organizasyon]
     paths: ['public/**', 'android/**', '.github/workflows/android.yml']
   workflow_dispatch:
 permissions:
@@ -24,6 +24,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with: { name: turnuva-fiksturu-apk, path: android/app/build/outputs/ }
       - name: APK'yı "apk" dalına koy
+        if: github.ref == 'refs/heads/main'
         run: |
           mkdir out && cp android/app/build/outputs/apk/release/app-release.apk out/turnuva-fiksturu.apk
           cp android/app/build/outputs/bundle/release/app-release.aab out/turnuva-fiksturu.aab

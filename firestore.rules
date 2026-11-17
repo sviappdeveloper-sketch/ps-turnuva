@@ -1,0 +1,44 @@
+rules_version = '2';
+// Turnuva Fikstürü · Organizasyonlar
+// orgs/{kod}            : organizasyon (ad, pub, owner, upd, d=JSON veri)
+// orgs/{kod}/eds/{uid}  : yönetici şifresini girenler (p=şifre, n=ad)
+// orgs/{kod}/vw/{uid}   : kapalı organizasyonu izleme şifresiyle açanlar
+// sec/{kod}             : şifreler (e=yönetici, v=izleme), yalnızca kurucu okur
+service cloud.firestore {
+  match /databases/{db}/documents {
+    function signed() { return request.auth != null; }
+    function orgOf(id) { return get(/databases/$(db)/documents/orgs/$(id)).data; }
+    function secOf(id) { return get(/databases/$(db)/documents/sec/$(id)).data; }
+    function isOwner(id) { return signed() && orgOf(id).owner == request.auth.uid; }
+    function isEd(id) { return signed() && exists(/databases/$(db)/documents/orgs/$(id)/eds/$(request.auth.uid)); }
+    function isVw(id) { return signed() && exists(/databases/$(db)/documents/orgs/$(id)/vw/$(request.auth.uid)); }
+    function okData(d) { return d.name is string && d.name.size() > 0 && d.name.size() <= 80 && d.d is string && d.d.size() < 900000 && d.pub is bool; }
+
+    match /orgs/{id} {
+      allow get: if resource.data.pub == true || (signed() && resource.data.owner == request.auth.uid) || isEd(id) || isVw(id);
+      allow list: if resource.data.pub == true;
+      allow create: if signed() && request.resource.data.owner == request.auth.uid && id.size() >= 6 && id.size() <= 12 && okData(request.resource.data);
+      allow update: if signed() && okData(request.resource.data)
+        && request.resource.data.owner == resource.data.owner
+        && (resource.data.owner == request.auth.uid
+            || (isEd(id) && request.resource.data.pub == resource.data.pub));
+      allow delete: if signed() && resource.data.owner == request.auth.uid;
+
+      match /eds/{uid} {
+        allow get: if signed() && (request.auth.uid == uid || isOwner(id));
+        allow list: if isOwner(id);
+        allow delete: if signed() && (request.auth.uid == uid || isOwner(id));
+        allow create: if signed() && request.auth.uid == uid && request.resource.data.p == secOf(id).e;
+      }
+      match /vw/{uid} {
+        allow get, delete: if signed() && request.auth.uid == uid;
+        allow create: if signed() && request.auth.uid == uid
+          && (request.resource.data.p == secOf(id).v || request.resource.data.p == secOf(id).e);
+      }
+    }
+    match /sec/{id} {
+      allow get, update, delete: if isOwner(id);
+      allow create: if signed() && getAfter(/databases/$(db)/documents/orgs/$(id)).data.owner == request.auth.uid;
+    }
+  }
+}

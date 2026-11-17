@@ -9,6 +9,10 @@ import android.os.Handler;
 import android.os.Looper;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebResourceRequest;
+import android.util.Base64;
+import androidx.core.content.FileProvider;
+import java.io.File;
+import java.io.FileOutputStream;
 import com.google.android.gms.ads.AdError;
 import com.google.android.gms.ads.AdRequest;
 import com.google.android.gms.ads.FullScreenContentCallback;
@@ -26,7 +30,7 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
 // Turnuva Fikstürü Android kabuğu: public/index.html telefonun içinden açılır.
-// Veriler (turnuvalar, oyuncular) cihazda localStorage'da tutulur. İnternet yalnızca reklam içindir:
+// Veriler (turnuvalar, oyuncular) cihazda localStorage'da tutulur; organizasyonlar Firebase'de. İnternet ayrıca reklam içindir:
 // her 5 skor kaydında bir tam ekran AdMob reklamı (sayfa window.TFReklam.goster() çağırır).
 public class MainActivity extends Activity {
     private WebView web;
@@ -48,6 +52,7 @@ public class MainActivity extends Activity {
         s.setTextZoom(100);
         web.setOverScrollMode(WebView.OVER_SCROLL_NEVER);
         web.addJavascriptInterface(new Reklam(), "TFReklam");
+        web.addJavascriptInterface(new Paylas(), "TFPaylas");
         web.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest r) {
@@ -110,6 +115,28 @@ public class MainActivity extends Activity {
             @Override public void onAdFailedToShowFullScreenContent(AdError e) { loadInter(); }
         });
         ad.show(this);
+    }
+
+    // PNG paylaşımı: sayfa window.TFPaylas.png(base64, dosyaAdı) çağırır, Android paylaş menüsü açılır
+    private class Paylas {
+        @JavascriptInterface public void png(String b64, String ad) {
+            try {
+                byte[] veri = Base64.decode(b64, Base64.DEFAULT);
+                File dir = new File(getCacheDir(), "paylas");
+                dir.mkdirs();
+                File[] eski = dir.listFiles();
+                if (eski != null) for (File f : eski) f.delete();
+                String temiz = (ad == null || ad.isEmpty()) ? "turnuva.png" : ad.replaceAll("[\\/:*?\"<>|]", "-");
+                File f = new File(dir, temiz);
+                try (FileOutputStream o = new FileOutputStream(f)) { o.write(veri); }
+                Uri u = FileProvider.getUriForFile(MainActivity.this, getPackageName() + ".paylas", f);
+                Intent i = new Intent(Intent.ACTION_SEND);
+                i.setType("image/png");
+                i.putExtra(Intent.EXTRA_STREAM, u);
+                i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                main.post(() -> startActivity(Intent.createChooser(i, "Paylaş")));
+            } catch (Exception ignored) {}
+        }
     }
 
     private class Reklam {

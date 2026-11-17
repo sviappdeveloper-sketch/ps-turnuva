@@ -44,3 +44,15 @@ codemagic.yaml   ← derleme, yükleme, mağaza sayfası, incelemeye gönderme
 
 Diğer her şey: Toplanmıyor.
 - Yeni sürüm: `ios/Config.xcconfig` içinde `MARKETING_VERSION`'ı artır (ör. 1.0.1), main'e gönder, sonra 5 ve 7.
+
+## Organizasyon (Firebase) kurulumu
+
+Organizasyonlar (gruplar + eleme, birden fazla yönetici, açık/kapalı) Firebase Firestore'da tutulur. Uygulama Firebase SDK'sı kullanmaz, REST ile konuşur (`public/org.js`).
+
+1. https://console.firebase.google.com → **Proje ekle** → ad: `turnuva-fiksturu` (Google Analytics gerekmez).
+2. **Build → Authentication → Başlayın → Sign-in method → Anonim (Anonymous) → Etkinleştir**.
+3. **Build → Firestore Database → Veritabanı oluştur** → konum `eur3 (europe-west)` → üretim modu.
+4. Firestore → **Kurallar (Rules)** sekmesi → bu depodaki `firestore.rules` dosyasının tamamını yapıştır → **Yayınla**.
+5. Proje ayarları (⚙️) → **Genel** → Uygulamalarınız → **Web (</>)** → takma ad `turnuva` → kaydet. Görünen `apiKey` ve `projectId` değerleri `public/org.js` başındaki `FB={apiKey:"",projectId:""}` satırına yazılır (bu anahtar gizli değildir, güvenliği kurallar sağlar).
+
+App Store "Uygulama Gizliliği" için ek: **Kullanıcı İçeriği → Diğer kullanıcı içeriği** (Uygulama işlevselliği, kimliğe bağlı değil, izleme yok) ve **Tanımlayıcılar → Kullanıcı kimliği** (Uygulama işlevselliği, kimliğe bağlı değil, izleme yok).

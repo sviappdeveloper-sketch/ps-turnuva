@@ -95,7 +95,7 @@ DB.lists=DB.lists||[];
 function nid(){return"t"+Date.now().toString(36)+Math.random().toString(36).slice(2,6)}
 function day(t){try{return new Date(t).toLocaleDateString("tr-TR",{day:"numeric",month:"long",year:"numeric"})}catch(e){return""}}
 function store(){try{localStorage.setItem("tf2",JSON.stringify(DB))}catch(e){}}
-function save(){if(S){S.updated=Date.now();DB.tours[S.id]=S;DB.cur=S.id}store()}
+function save(){if(S&&S.org){orgSave();return}if(S){S.updated=Date.now();DB.tours[S.id]=S;DB.cur=S.id}store()}
 // aynı oyuncu/takım topluluğunu tanımak için (sıra ve büyük-küçük harf önemsiz)
 function canon(n){return String(n).trim().toLocaleLowerCase("tr")}
 function keyOf(pl){return pl.map(canon).sort().join("|")}
@@ -114,10 +114,12 @@ function gen(n,dbl){
   var out=[];
   all.forEach(function(x,j){x.forEach(function(p){out.push({h:p[0],a:p[1],r:j+1,d:0,hg:0,ag:0,hy:0,hr:0,ay:0,ar:0})})});
   return out}
+// bir turun maç sayısı: final tek maç seçildiyse finalde 1, yoksa turnuvanın ayarı
+function LG(r){return S.fs&&S.size&&Math.pow(2,r)>=S.size?1:S.legs}
 function win(m){if(!m.d)return -2;if(m.bye||m.hg>m.ag)return m.h;if(m.ag>m.hg)return m.a;return m.ph>m.pa?m.h:m.a}
 function ties(){var T={};S.matches.forEach(function(m){var r=T[m.r]=T[m.r]||[];(r[m.k]=r[m.k]||[]).push(m)});return T}
 function tw(t){var a=t[0];if(!a.d)return -2;if(a.bye||t.length<2)return win(a);var b=t[1];if(!b.d)return -2;var sp=a.hg+b.ag,sq=a.ag+b.hg;if(sp!==sq)return sp>sq?a.h:a.a;return b.ph>b.pa?b.h:b.a}
-function agg(x){if(S.mode!=="eleme"||S.legs!==2||x.leg!==2||!x.d)return"";var a=S.matches.filter(function(m){return m.r===x.r&&m.k===x.k&&m.leg===1})[0];if(!a||!a.d)return"";return'<div class="mu">Toplam: '+esc(S.players[a.h])+" "+(a.hg+x.ag)+" - "+(a.ag+x.hg)+" "+esc(S.players[a.a])+"</div>"}
+function agg(x){if(S.mode!=="eleme"||LG(x.r)!==2||x.leg!==2||!x.d)return"";var a=S.matches.filter(function(m){return m.r===x.r&&m.k===x.k&&m.leg===1})[0];if(!a||!a.d)return"";return'<div class="mu">Toplam: '+esc(S.players[a.h])+" "+(a.hg+x.ag)+" - "+(a.ag+x.hg)+" "+esc(S.players[a.a])+"</div>"}
 function rn(i){var v=$("#pn"+i).value.trim();if(v){S.players[i]=v;save()}render()}
 function anyp(){return S.matches.some(function(x){return x.d&&!x.bye})}
 function ap(){var v=$("#pnew").value.trim();if(!v)return;
@@ -140,10 +142,11 @@ function plist(){
   h+='<div class="row"><input type="text" id="pnew" placeholder="Yeni oyuncu" onkeydown="if(event.key===\'Enter\')ap()"><button onclick="ap()">Ekle</button></div><div class="mu" style="color:var(--rd)">'+(S.pe||"")+'</div></div><div class="mu">Ligde yeni oyuncu eklenince mevcut oyuncularla yeni maçlar eklenir, oynanan maçlar korunur. Silinen oyuncunun maçları da silinir. Elemede ilk maç oynanmadan ekleme ve silme yapılabilir.</div>';
   return h}
 function blank(h,a,r,k,l){return{r:r,k:k,leg:l,h:h,a:a,d:0,hg:0,ag:0,hy:0,hr:0,ay:0,ar:0,ph:0,pa:0}}
-function knock(n){
-  var size=2,out=[],i,r,cnt;while(size<n)size*=2;S.size=size;
-  for(i=0;i<size/2;i++){var b=size-1-i,m=blank(i,b<n?b:-1,1,i,1);out.push(m);if(b>=n){m.bye=1;m.d=1}else if(S.legs===2)out.push(blank(b,i,1,i,2))}
-  for(r=2,cnt=size/4;cnt>=1;r++,cnt/=2)for(i=0;i<cnt;i++){out.push(blank(-2,-2,r,i,1));if(S.legs===2)out.push(blank(-2,-2,r,i,2))}
+// pairs verilirse ilk tur eşleşmeleri o sırayla kurulur ([ev, deplasman], rakip -1 ise bay)
+function knock(n,pairs){
+  var size=2,out=[],i,r,cnt;if(pairs)size=Math.max(2,pairs.length*2);else while(size<n)size*=2;S.size=size;
+  for(i=0;i<size/2;i++){var b=size-1-i,h=pairs?pairs[i][0]:i,a=pairs?pairs[i][1]:(b<n?b:-1),m=blank(h,a,1,i,1);out.push(m);if(a<0){m.bye=1;m.d=1}else if(LG(1)===2)out.push(blank(a,h,1,i,2))}
+  for(r=2,cnt=size/4;cnt>=1;r++,cnt/=2)for(i=0;i<cnt;i++){out.push(blank(-2,-2,r,i,1));if(LG(r)===2)out.push(blank(-2,-2,r,i,2))}
   return out}
 function adv(){
   var rd=ties();
@@ -178,8 +181,8 @@ function tab(t){S.tab=t;S.da=-1;S.pe="";save();render()}
 function num(id){var e=$("#"+id),v=e?parseInt(e.value,10):0;return isNaN(v)||v<0?0:v}
 function sv(i){var x=S.matches[i];
   x.hg=num("g"+i+"h");x.ag=num("g"+i+"a");x.hy=num("y"+i+"h");x.ay=num("y"+i+"a");x.hr=num("k"+i+"h");x.ar=num("k"+i+"a");
-  if(S.mode==="eleme"){x.ph=num("p"+i+"h");x.pa=num("p"+i+"a");var tied=x.hg===x.ag;if(S.legs===2){tied=false;if(x.leg===2){var a1=S.matches.filter(function(m){return m.r===x.r&&m.k===x.k&&m.leg===1})[0];tied=a1.hg+x.ag===a1.ag+x.hg}}if(!tied){x.ph=0;x.pa=0}else if(x.ph===x.pa){var er=$("#er"+i);if(er)er.textContent="Eşitlikte penaltı skoru farklı olmalı.";return}}
-  x.d=1;if(S.mode==="eleme"){if(S.legs===2&&x.leg===1)S.matches.forEach(function(m){if(m.r===x.r&&m.k===x.k&&m.leg===2)m.d=0});adv()}save();render();reklamSay()}
+  if(S.mode==="eleme"){x.ph=num("p"+i+"h");x.pa=num("p"+i+"a");var tied=x.hg===x.ag;if(LG(x.r)===2){tied=false;if(x.leg===2){var a1=S.matches.filter(function(m){return m.r===x.r&&m.k===x.k&&m.leg===1})[0];tied=a1.hg+x.ag===a1.ag+x.hg}}if(!tied){x.ph=0;x.pa=0}else if(x.ph===x.pa){var er=$("#er"+i);if(er)er.textContent="Eşitlikte penaltı skoru farklı olmalı.";return}}
+  x.d=1;if(S.mode==="eleme"){if(LG(x.r)===2&&x.leg===1)S.matches.forEach(function(m){if(m.r===x.r&&m.k===x.k&&m.leg===2)m.d=0});adv()}save();render();reklamSay()}
 // iPhone ve Android uygulamasında her 5 skor kaydında bir tam ekran reklam (reklam yoksa hiçbir şey yapmaz)
 function reklamSay(){try{if(!window.TFReklam)return;var n=(parseInt(localStorage.getItem("pst1-kayit")||"0",10)||0)+1;localStorage.setItem("pst1-kayit",String(n));if(n%5===0)setTimeout(function(){window.TFReklam.goster()},400)}catch(e){}}
 function ed(i){S.matches[i].d=0;if(S.mode==="eleme")adv();save();render()}
@@ -203,6 +206,7 @@ function menu(){
   if(c){var st=statusOf(c);if(!st.done)h+='<button class="big" onclick="openT(\''+c.id+'\')"><span class="ic">▶</span><span>Devam et: '+esc(c.name)+'<small>'+(c.mode==="eleme"?"Turnuva":"Lig")+" · "+st.d+"/"+st.n+" maç oynandı</small></span></button>"}
   h+='<button class="big" onclick="newT(\'lig\')"><span class="ic">📋</span><span>Lig Fikstürü<small>Herkes herkesle oynar, puan tablosu</small></span></button>';
   h+='<button class="big" onclick="newT(\'eleme\')"><span class="ic">🏆</span><span>Turnuva Fikstürü<small>Eleme usulü, kaybeden elenir, final oynanır</small></span></button>';
+  h+='<button class="big" onclick="go(\'org\')"><span class="ic">🏟️</span><span>Organizasyon<small>Gruplar + eleme (eski Şampiyonlar Ligi usulü), birden fazla yönetici, açık ya da kapalı</small></span></button>';
   h+='<div style="height:14px"></div><button class="big alt" onclick="go(\'stats\')"><span class="ic">📊</span><span>İstatistikler<small>Tüm turnuvalarda genel tablo ve oyuncular arası karşılaşmalar</small></span></button>';
   h+='<button class="big alt" onclick="go(\'saved\')"><span class="ic">📁</span><span>Kayıtlı turnuvalarım'+(ids.length?" ("+ids.length+")":"")+'<small>Önceki turnuvalar, kayıtlı takım/oyuncu listeleri ve aynı takımlarla geçmiş istatistikler</small></span></button>';
   return h}
@@ -259,20 +263,22 @@ function hist(){
   ts.slice().reverse().forEach(function(T){var st=statusOf(T);h+='<div class="card"><div class="it"><div><div class="nm">'+esc(T.name)+'</div><div class="mu" style="text-align:left"><span class="tg">'+(T.mode==="eleme"?"Turnuva":"Lig")+'</span><span class="tg">'+(T.legs===2?"Rövanşlı":"Rövanşsız")+"</span>"+day(T.created)+'</div><div style="margin-top:6px">'+(st.done?'<span class="tg ok">🏆 '+esc(st.win)+"</span>":'<span class="tg">Devam ediyor · '+st.d+"/"+st.n+"</span>")+'</div></div><button class="g" onclick="openT(\''+T.id+'\')">Aç</button></div></div>'});
   return h}
 function fix(){
-  var h='<div class="btns" style="margin:0 0 4px"><button class="'+(S.cf==="rd"?"w":"g")+'" onclick="redraw()">'+(S.cf==="rd"?"Skorlar silinir, emin misin?":"🔀 Kurayı yeniden çek")+'</button><button class="'+(S.cf==="rs"?"w":"d")+'" onclick="resetS()">'+(S.cf==="rs"?"Tüm skorlar silinsin mi?":"↺ Sıfırla")+'</button></div>'
-    +'<div class="mu" style="'+(S.fl?"color:var(--ac);font-weight:600":"")+'">'+(S.fl||"Kura: eşleşmeleri yeniden dağıtır. Sıfırla: fikstür aynı kalır, skorlar silinir.")+"</div>",last=0;if(S.mode==="eleme"){var ch=champ();if(ch>=0)h+='<div class="card" style="text-align:center"><div class="sc" style="font-size:34px">🏆 '+esc(S.players[ch])+'</div><div class="mu">Şampiyon</div></div>'}
+  var h=S.org?"":'<div class="btns" style="margin:0 0 4px"><button class="'+(S.cf==="rd"?"w":"g")+'" onclick="redraw()">'+(S.cf==="rd"?"Skorlar silinir, emin misin?":"🔀 Kurayı yeniden çek")+'</button><button class="'+(S.cf==="rs"?"w":"d")+'" onclick="resetS()">'+(S.cf==="rs"?"Tüm skorlar silinsin mi?":"↺ Sıfırla")+'</button></div>'
+    +'<div class="mu" style="'+(S.fl?"color:var(--ac);font-weight:600":"")+'">'+(S.fl||"Kura: eşleşmeleri yeniden dağıtır. Sıfırla: fikstür aynı kalır, skorlar silinir.")+"</div>",last=0;
+  if(!S.org)h+=pngBtn("fix");if(S.mode==="eleme"){var ch=champ();if(ch>=0)h+='<div class="card" style="text-align:center"><div class="sc" style="font-size:34px">🏆 '+esc(S.players[ch])+'</div><div class="mu">Şampiyon</div></div>'}
   S.matches.forEach(function(x,i){
     if(x.r!==last){last=x.r;h+="<h2>"+(S.mode==="eleme"?rname(x.r):x.r+". Hafta")+"</h2>"}
     if(x.bye){h+='<div class="card mu">'+esc(S.players[x.h])+" bay geçti</div>";return}
     if(x.h<0||x.a<0){h+='<div class="card mu">'+(x.h>=0?esc(S.players[x.h]):"?")+" - "+(x.a>=0?esc(S.players[x.a]):"?")+" (rakip bekleniyor)</div>";return}
-    var lb="";if(S.mode==="eleme"&&S.legs===2){var a1=S.matches.filter(function(m){return m.r===x.r&&m.k===x.k&&m.leg===1})[0];if(x.leg===2&&!a1.d){h+='<div class="card mu">'+esc(S.players[x.h])+" - "+esc(S.players[x.a])+" (rövanş, ilk maç oynanınca açılır)</div>";return}lb='<div class="mu">'+(x.leg===2?"Rövanş":"İlk maç")+"</div>"}
+    var lb="";if(S.mode==="eleme"&&LG(x.r)===2){var a1=S.matches.filter(function(m){return m.r===x.r&&m.k===x.k&&m.leg===1})[0];if(x.leg===2&&!a1.d){h+='<div class="card mu">'+esc(S.players[x.h])+" - "+esc(S.players[x.a])+" (rövanş, ilk maç oynanınca açılır)</div>";return}lb='<div class="mu">'+(x.leg===2?"Rövanş":"İlk maç")+"</div>"}
     var H=esc(S.players[x.h]),A=esc(S.players[x.a]);
     if(x.d){
-      h+='<div class="card">'+lb+'<div class="done"><b>'+H+'</b><span class="sc">'+x.hg+" - "+x.ag+'</span><b>'+A+'</b></div>'+((x.ph||x.pa)?'<div class="mu">Penaltılar: '+x.ph+" - "+x.pa+"</div>":"")+agg(x)+'<div class="mu"><span class="cy"></span> '+x.hy+"-"+x.ay+' &nbsp; <span class="cr"></span> '+x.hr+"-"+x.ar+'</div><button class="g" style="width:100%;margin-top:8px" onclick="ed('+i+')">Düzenle</button></div>'
+      h+='<div class="card">'+lb+'<div class="done"><b>'+H+'</b><span class="sc">'+x.hg+" - "+x.ag+'</span><b>'+A+'</b></div>'+((x.ph||x.pa)?'<div class="mu">Penaltılar: '+x.ph+" - "+x.pa+"</div>":"")+agg(x)+'<div class="mu"><span class="cy"></span> '+x.hy+"-"+x.ay+' &nbsp; <span class="cr"></span> '+x.hr+"-"+x.ar+'</div>'+(S.ro?"":'<button class="g" style="width:100%;margin-top:8px" onclick="ed('+i+')">Düzenle</button>')+"</div>"
+    }else if(S.ro){h+='<div class="card">'+lb+'<div class="done"><b>'+H+'</b><span class="sc" style="color:var(--mu)">-</span><b>'+A+"</b></div></div>"
     }else{
       h+='<div class="card">'+lb+'<div class="mt"><span class="n">'+H+"</span>"+inp("g"+i+"h",0)+"<span>-</span>"+inp("g"+i+"a",0)+'<span class="n">'+A+'</span></div>'
       +'<div class="sub"><label><span><span class="cy"></span> Sarı</span>'+inp("y"+i+"h",0)+'</label><label>'+inp("y"+i+"a",0)+'</label><label><span><span class="cr"></span> Kırmızı</span>'+inp("k"+i+"h",0)+'</label><label>'+inp("k"+i+"a",0)+'</label></div>'
-      +(S.mode==="eleme"&&(S.legs!==2||x.leg===2)?'<div class="sub"><label><span>Penaltı (eşitlikte)</span>'+inp("p"+i+"h",0)+'</label><label>'+inp("p"+i+"a",0)+'</label></div>':"")+'<div class="mu" id="er'+i+'" style="color:var(--rd)"></div><button style="width:100%" onclick="sv('+i+')">Skoru kaydet</button></div>'}
+      +(S.mode==="eleme"&&(LG(x.r)!==2||x.leg===2)?'<div class="sub"><label><span>Penaltı (eşitlikte)</span>'+inp("p"+i+"h",0)+'</label><label>'+inp("p"+i+"a",0)+'</label></div>':"")+'<div class="mu" id="er'+i+'" style="color:var(--rd)"></div><button style="width:100%" onclick="sv('+i+')">Skoru kaydet</button></div>'}
   });
   return h}
 function table(){
@@ -283,7 +289,7 @@ function table(){
   return t.sort(function(a,b){return b.p-a.p||(b.gf-b.ga)-(a.gf-a.ga)||b.gf-a.gf||a.n.localeCompare(b.n,"tr")})}
 function stand(){
   var t=table(),played=S.matches.filter(function(x){return x.d}).length;
-  var h='<div class="card wrap"><table><tr><th>#</th><th class="l">Oyuncu</th><th class="p">P</th><th>O</th><th>G</th><th>B</th><th>M</th><th>AG</th><th>YG</th><th>AV</th><th><span class="cy"></span></th><th><span class="cr"></span></th></tr>';
+  var h=pngBtn("stand")+'<div class="card wrap"><table><tr><th>#</th><th class="l">Oyuncu</th><th class="p">P</th><th>O</th><th>G</th><th>B</th><th>M</th><th>AG</th><th>YG</th><th>AV</th><th><span class="cy"></span></th><th><span class="cr"></span></th></tr>';
   t.forEach(function(r,i){
     h+='<tr'+(i===0&&played?' class="f"':"")+"><td>"+(i+1)+'</td><td class="l">'+esc(r.n)+'</td><td class="p">'+r.p+"</td><td>"+r.o+"</td><td>"+r.g+"</td><td>"+r.b+"</td><td>"+r.m+"</td><td>"+r.gf+"</td><td>"+r.ga+"</td><td>"+(r.gf-r.ga)+"</td><td>"+r.y+"</td><td>"+r.k+"</td></tr>"});
   h+='</table></div><div class="mu">O oynanan, G galibiyet, B beraberlik, M mağlubiyet, AG atılan gol, YG yenen gol, AV averaj, P puan. Galibiyet 3, beraberlik 1 puan.</div>';
@@ -354,6 +360,7 @@ function render(){
   else if(V.v==="saved")h=saved();
   else if(V.v==="hist")h=hist();
   else if(V.v==="stats")h=stats();
+  else if(V.v.slice(0,3)==="org")h=orgRender();
   else if(V.v!=="tour"||!S)h=menu();
   else{
     var d=S.matches.filter(function(x){return x.d&&!x.bye}).length;
@@ -363,5 +370,5 @@ function render(){
 (function(){var sp=$("#splash");if(DB.cur&&DB.tours[DB.cur])S=DB.tours[DB.cur];setTimeout(function(){sp.classList.add("off");setTimeout(function(){sp.remove()},500)},1400)})();
 document.addEventListener("focusin",function(e){var t=e.target;if(t.type==="number"&&t.value==="0")t.value=""});
 document.addEventListener("focusout",function(e){var t=e.target;if(t.type==="number"&&t.value==="")t.value="0"});
-render();
-</script></body></html>
+window.addEventListener("load",render);
+</script><script src="png.js"></script><script src="org.js"></script></body></html>

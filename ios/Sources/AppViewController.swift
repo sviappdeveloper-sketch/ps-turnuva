@@ -33,6 +33,11 @@ final class AppViewController: UIViewController {
       cfg.setURLSchemeHandler(BundleSchemeHandler(root: root), forURLScheme: Self.scheme)
     }
     cfg.websiteDataStore = .default()   // localStorage kalıcı
+    // PNG paylaşımı: window.TFPaylas.png(base64, dosyaAdı) → iOS paylaş menüsü
+    cfg.userContentController.add(WeakMessageHandler(self), name: "tfpng")
+    cfg.userContentController.addUserScript(WKUserScript(
+      source: "window.TFPaylas={png:function(b,n){window.webkit.messageHandlers.tfpng.postMessage({b:b,n:n})}};",
+      injectionTime: .atDocumentStart, forMainFrameOnly: true))
     if Self.adsReady {
       cfg.userContentController.add(WeakMessageHandler(self), name: "tf")
       cfg.userContentController.addUserScript(WKUserScript(
@@ -123,6 +128,22 @@ final class AppViewController: UIViewController {
   }
 }
 
+extension AppViewController {
+  fileprivate func sharePNG(base64: String, name: String) {
+    guard let data = Data(base64Encoded: base64) else { return }
+    let safe = name.replacingOccurrences(of: "/", with: "-")
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(safe.isEmpty ? "turnuva.png" : safe)
+    try? data.write(to: url)
+    let vc = UIActivityViewController(activityItems: [url], applicationActivities: nil)
+    if let pop = vc.popoverPresentationController {
+      pop.sourceView = view
+      pop.sourceRect = CGRect(x: view.bounds.midX, y: view.bounds.midY, width: 1, height: 1)
+      pop.permittedArrowDirections = []
+    }
+    present(vc, animated: true)
+  }
+}
+
 extension AppViewController: FullScreenContentDelegate {
   func adDidDismissFullScreenContent(_ ad: FullScreenPresentingAd) { loadInter() }
   func ad(_ ad: FullScreenPresentingAd, didFailToPresentFullScreenContentWithError error: Error) { loadInter() }
@@ -133,6 +154,9 @@ private final class WeakMessageHandler: NSObject, WKScriptMessageHandler {
   weak var target: AppViewController?
   init(_ t: AppViewController) { target = t }
   func userContentController(_ c: WKUserContentController, didReceive message: WKScriptMessage) {
+    if message.name == "tfpng", let d = message.body as? [String: Any], let b = d["b"] as? String {
+      target?.sharePNG(base64: b, name: (d["n"] as? String) ?? "turnuva.png"); return
+    }
     if (message.body as? String) == "reklam" { target?.showInterstitial() }
   }
 }
