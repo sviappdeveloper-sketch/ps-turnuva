@@ -78,6 +78,8 @@ select{font:inherit;width:100%;padding:10px;border:1px solid var(--bd);border-ra
 .ml{display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--bd);font-size:15px}.ml:last-child{border:0}
 .tg{display:inline-block;font-size:12px;font-weight:700;border-radius:6px;padding:2px 7px;background:var(--in);color:var(--mu);margin-right:4px}
 .tg.ok{background:var(--ac2);color:#fff}
+#exitAsk{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center}
+#exitAsk .card{margin:0}
 </style></head><body>
 <div id="splash"><img src="logo.png" alt=""><div class="t">Turnuva Fikstürü</div></div>
 <main><div id="app"></div></main>
@@ -95,7 +97,7 @@ DB.lists=DB.lists||[];
 function nid(){return"t"+Date.now().toString(36)+Math.random().toString(36).slice(2,6)}
 function day(t){try{return new Date(t).toLocaleDateString("tr-TR",{day:"numeric",month:"long",year:"numeric"})}catch(e){return""}}
 function store(){try{localStorage.setItem("tf2",JSON.stringify(DB))}catch(e){}}
-function save(){if(S&&S.org){orgSave();return}if(S){S.updated=Date.now();DB.tours[S.id]=S;DB.cur=S.id}store()}
+function save(){if(S&&S.view)return;if(S&&S.org){orgSave();return}if(S){S.updated=Date.now();DB.tours[S.id]=S;DB.cur=S.id}store();if(S&&S.pay&&window.paySync)paySync(S)}
 // aynı oyuncu/takım topluluğunu tanımak için (sıra ve büyük-küçük harf önemsiz)
 function canon(n){return String(n).trim().toLocaleLowerCase("tr")}
 function keyOf(pl){return pl.map(canon).sort().join("|")}
@@ -137,10 +139,13 @@ function dp(i){
   else{S.players.splice(i,1);S.matches=S.matches.filter(function(x){return x.h!==i&&x.a!==i});S.matches.forEach(function(x){if(x.h>i)x.h--;if(x.a>i)x.a--})}
   S.pe="";save();render()}
 function plist(){
+  if(S.ro)return'<div class="card"><h2 style="margin-top:0">Oyuncular ('+S.players.length+')</h2>'+S.players.map(function(p){return'<div class="ml"><span>'+esc(p)+"</span></div>"}).join("")+"</div>";
   var h='<div class="card"><h2 style="margin-top:0">Oyuncular</h2>';
   S.players.forEach(function(p,i){h+='<div class="row" style="margin-bottom:8px"><input type="text" id="pn'+i+'" value="'+esc(p)+'" onchange="rn('+i+')"><button class="g" onclick="dp('+i+')">'+(S.da===i?"Emin misin?":"Sil")+'</button></div>'});
   h+='<div class="row"><input type="text" id="pnew" placeholder="Yeni oyuncu" onkeydown="if(event.key===\'Enter\')ap()"><button onclick="ap()">Ekle</button></div><div class="mu" style="color:var(--rd)">'+(S.pe||"")+'</div></div><div class="mu">Ligde yeni oyuncu eklenince mevcut oyuncularla yeni maçlar eklenir, oynanan maçlar korunur. Silinen oyuncunun maçları da silinir. Elemede ilk maç oynanmadan ekleme ve silme yapılabilir.</div>';
+  h+='<div class="card" style="margin-top:14px"><div class="lbl" style="margin-top:0">Turnuvayı sil</div><div class="mu" style="text-align:left">Fikstür, skorlar ve bu turnuvanın istatistikleri silinir'+(S.pay?"; paylaşım kodu da geçersiz olur":"")+'. Geri alınamaz.</div><button class="'+(V.del===S.id?"w":"d")+'" style="width:100%;margin-top:8px" onclick="delIn()">'+(V.del===S.id?"Silinsin mi? Geri alınamaz.":"🗑 Turnuvayı sil")+"</button></div>";
   return h}
+function delIn(){var id=S.id;if(V.del!==id){V.del=id;render();setTimeout(function(){if(V.del===id){V.del=null;render()}},3500);return}delT(id);go("menu")}
 function blank(h,a,r,k,l){return{r:r,k:k,leg:l,h:h,a:a,d:0,hg:0,ag:0,hy:0,hr:0,ay:0,ar:0,ph:0,pa:0}}
 // pairs verilirse ilk tur eşleşmeleri o sırayla kurulur ([ev, deplasman], rakip -1 ise bay)
 function knock(n,pairs){
@@ -155,7 +160,7 @@ function adv(){
     if(m.h!==nh||m.a!==na)t.forEach(function(x,j){x.h=j?na:nh;x.a=j?nh:na;x.d=0;x.hg=x.ag=x.hy=x.hr=x.ay=x.ar=x.ph=x.pa=0})})}
 function champ(){var f=S.matches[S.matches.length-1];return f?tw(ties()[f.r][0]):-2}
 function rname(r){var d=Math.log2(S.size)-r;return d===0?"Final":d===1?"Yarı Final":d===2?"Çeyrek Final":r+". Tur"}
-function go(v,x){V={v:v};for(var k in x||{})V[k]=x[k];window.scrollTo(0,0);render()}
+function go(v,x){if(S&&S.view&&v!=="tour")S=DB.cur&&DB.tours[DB.cur]||null;V={v:v};for(var k in x||{})V[k]=x[k];window.scrollTo(0,0);render()}
 function newT(mode){V={v:"setup",mode:mode,legs:1,players:[],name:"",err:""};window.scrollTo(0,0);render()}
 function sname(){var e=$("#tn");if(e)V.name=e.value}
 function add(){sname();var e=$("#nm"),v=e.value.trim();if(!v)return;if(V.players.some(function(p){return canon(p)===canon(v)})){V.err="Bu isim zaten listede.";render();return}V.players.push(v);V.err="";render();$("#nm").focus()}
@@ -169,6 +174,7 @@ function start(){sname();if(V.players.length<2){V.err="En az 2 oyuncu/takım ekl
   addList(S.players);save();V={v:"tour"};window.scrollTo(0,0);render()}
 function openT(id){S=DB.tours[id];if(!S)return;S.tab=0;S.da=-1;S.pe="";DB.cur=id;store();go("tour")}
 function delT(id){if(V.del!==id){V.del=id;render();setTimeout(function(){if(V.del===id){V.del=null;render()}},3500);return}
+  var T=DB.tours[id];if(T&&T.pay&&window.payRemote)payRemote(T.pay).catch(function(){});
   delete DB.tours[id];if(DB.cur===id)DB.cur=null;if(S&&S.id===id)S=null;V.del=null;store();render()}
 function delL(id){if(V.dell!==id){V.dell=id;render();setTimeout(function(){if(V.dell===id){V.dell=null;render()}},3500);return}
   DB.lists=DB.lists.filter(function(l){return l.id!==id});V.dell=null;store();render()}
@@ -207,8 +213,10 @@ function menu(){
   h+='<button class="big" onclick="newT(\'lig\')"><span class="ic">📋</span><span>Lig Fikstürü<small>Herkes herkesle oynar, puan tablosu</small></span></button>';
   h+='<button class="big" onclick="newT(\'eleme\')"><span class="ic">🏆</span><span>Turnuva Fikstürü<small>Eleme usulü, kaybeden elenir, final oynanır</small></span></button>';
   h+='<button class="big" onclick="go(\'org\')"><span class="ic">🏟️</span><span>Organizasyon<small>Gruplar + eleme (eski Şampiyonlar Ligi usulü), birden fazla yönetici, açık ya da kapalı</small></span></button>';
+  h+='<button class="big" onclick="freeNew()"><span class="ic">⚽</span><span>Serbest karşılaşma<small>Turnuvasız tek maç; skor kayıtlara ve istatistiklere girer, sınırsız</small></span></button>';
   h+='<div style="height:14px"></div><button class="big alt" onclick="go(\'stats\')"><span class="ic">📊</span><span>İstatistikler<small>Tüm turnuvalarda genel tablo ve oyuncular arası karşılaşmalar</small></span></button>';
   h+='<button class="big alt" onclick="go(\'saved\')"><span class="ic">📁</span><span>Kayıtlı turnuvalarım'+(ids.length?" ("+ids.length+")":"")+'<small>Önceki turnuvalar, kayıtlı takım/oyuncu listeleri ve aynı takımlarla geçmiş istatistikler</small></span></button>';
+  h+='<button class="big alt" onclick="viewOpenScreen()"><span class="ic">🔎</span><span>Kodla turnuva görüntüle<small>Arkadaşının paylaştığı turnuvanın tüm ayrıntıları</small></span></button>';
   return h}
 function setup(){
   var lig=V.mode!=="eleme",h=head(lig?"Lig Fikstürü":"Turnuva Fikstürü");
@@ -263,9 +271,9 @@ function hist(){
   ts.slice().reverse().forEach(function(T){var st=statusOf(T);h+='<div class="card"><div class="it"><div><div class="nm">'+esc(T.name)+'</div><div class="mu" style="text-align:left"><span class="tg">'+(T.mode==="eleme"?"Turnuva":"Lig")+'</span><span class="tg">'+(T.legs===2?"Rövanşlı":"Rövanşsız")+"</span>"+day(T.created)+'</div><div style="margin-top:6px">'+(st.done?'<span class="tg ok">🏆 '+esc(st.win)+"</span>":'<span class="tg">Devam ediyor · '+st.d+"/"+st.n+"</span>")+'</div></div><button class="g" onclick="openT(\''+T.id+'\')">Aç</button></div></div>'});
   return h}
 function fix(){
-  var h=S.org?"":'<div class="btns" style="margin:0 0 4px"><button class="'+(S.cf==="rd"?"w":"g")+'" onclick="redraw()">'+(S.cf==="rd"?"Skorlar silinir, emin misin?":"🔀 Kurayı yeniden çek")+'</button><button class="'+(S.cf==="rs"?"w":"d")+'" onclick="resetS()">'+(S.cf==="rs"?"Tüm skorlar silinsin mi?":"↺ Sıfırla")+'</button></div>'
+  var h=S.org||S.ro?"":'<div class="btns" style="margin:0 0 4px"><button class="'+(S.cf==="rd"?"w":"g")+'" onclick="redraw()">'+(S.cf==="rd"?"Skorlar silinir, emin misin?":"🔀 Kurayı yeniden çek")+'</button><button class="'+(S.cf==="rs"?"w":"d")+'" onclick="resetS()">'+(S.cf==="rs"?"Tüm skorlar silinsin mi?":"↺ Sıfırla")+'</button></div>'
     +'<div class="mu" style="'+(S.fl?"color:var(--ac);font-weight:600":"")+'">'+(S.fl||"Kura: eşleşmeleri yeniden dağıtır. Sıfırla: fikstür aynı kalır, skorlar silinir.")+"</div>",last=0;
-  if(!S.org)h+=pngBtn("fix");if(S.mode==="eleme"){var ch=champ();if(ch>=0)h+='<div class="card" style="text-align:center"><div class="sc" style="font-size:34px">🏆 '+esc(S.players[ch])+'</div><div class="mu">Şampiyon</div></div>'}
+  if(!S.org||S.view)h+=pngBtn("fix");if(S.mode==="eleme"){var ch=champ();if(ch>=0)h+='<div class="card" style="text-align:center"><div class="sc" style="font-size:34px">🏆 '+esc(S.players[ch])+'</div><div class="mu">Şampiyon</div></div>'}
   S.matches.forEach(function(x,i){
     if(x.r!==last){last=x.r;h+="<h2>"+(S.mode==="eleme"?rname(x.r):x.r+". Hafta")+"</h2>"}
     if(x.bye){h+='<div class="card mu">'+esc(S.players[x.h])+" bay geçti</div>";return}
@@ -320,20 +328,21 @@ function h2h(){var n=S.players.length;if(n<2)return"";
   return h+"</div>"+(S.mode==="eleme"?'<div class="mu">Berabere biten eleme maçı penaltıyı kazanana yazılır.</div>':"")}
 // ana menüdeki İstatistikler: kayıtlı bütün turnuvalar (isimler büyük-küçük harf önemsiz eşleşir)
 function stats(){
-  var ts=Object.keys(DB.tours).map(function(id){return DB.tours[id]}).sort(function(a,b){return(a.created||0)-(b.created||0)});
+  var ts=Object.keys(DB.tours).map(function(id){return DB.tours[id]}).sort(function(a,b){return(a.created||0)-(b.created||0)}),nT=ts.length,FT=freeTour();
+  if(FT)ts.push(FT);
   var h=head("İstatistikler"),A={},P={};
-  ts.forEach(function(T){var st=statusOf(T),seen={};
-    withS(T,function(){table().forEach(function(r){var c=canon(r.n),a=A[c]=A[c]||{c:c,n:r.n,t:0,ch:0,o:0,g:0,b:0,m:0,gf:0,ga:0,y:0,k:0};a.n=r.n;
-      if(!seen[c]){seen[c]=1;a.t++}["o","g","b","m","gf","ga","y","k"].forEach(function(f){a[f]+=r[f]})})});
+  ts.forEach(function(T){var st=T.free?{}:statusOf(T),seen={};
+    withS(T,function(){table().forEach(function(r){var c=canon(r.n),a=A[c]=A[c]||{c:c,n:r.n,t:0,ch:0,o:0,g:0,b:0,m:0,gf:0,ga:0,y:0,k:0};if(!T.free||!a.o)a.n=r.n;
+      if(!seen[c]){seen[c]=1;if(!T.free)a.t++}["o","g","b","m","gf","ga","y","k"].forEach(function(f){a[f]+=r[f]})})});
     if(st.done&&A[canon(st.win)])A[canon(st.win)].ch++;
     T.matches.forEach(function(x){if(!x.d||x.bye||x.h<0||x.a<0)return;var hn=canon(T.players[x.h]),an=canon(T.players[x.a]),f=hn<an,id=f?hn+"|"+an:an+"|"+hn;P[id]=(P[id]||0)+1})});
   var rows=Object.keys(A).map(function(c){return A[c]}).filter(function(r){return r.o||r.ch}).sort(function(a,b){return b.ch-a.ch||b.g-a.g||(b.g*3+b.b)-(a.g*3+a.b)||(b.gf-b.ga)-(a.gf-a.ga)||b.gf-a.gf});
-  if(!rows.length)return h+'<div class="card mu">Henüz oynanmış maç yok. Bir lig ya da turnuva başlatıp skor girince istatistikler burada toplanır.</div>';
+  if(!rows.length)return h+'<div class="card mu">Henüz oynanmış maç yok. Bir lig, turnuva ya da serbest karşılaşma başlatıp skor girince istatistikler burada toplanır.</div>';
   var nm=function(c){return esc(A[c]?A[c].n:c)};
-  h+='<div class="mu" style="text-align:left;margin-bottom:10px">'+ts.length+" turnuva · "+rows.length+" oyuncu · "+Object.keys(P).reduce(function(s,k){return s+P[k]},0)+" maç</div>";
+  h+='<div class="mu" style="text-align:left;margin-bottom:10px">'+nT+" turnuva"+(FT?" · "+DB.free.length+" serbest maç":"")+" · "+rows.length+" oyuncu · "+Object.keys(P).reduce(function(s,k){return s+P[k]},0)+" maç</div>";
   h+='<h2>Genel tablo</h2><div class="card wrap"><table><tr><th>#</th><th class="l">Oyuncu</th><th class="p">🏆</th><th>T</th><th>O</th><th>G</th><th>B</th><th>M</th><th>Gol</th><th>AV</th><th><span class="cy"></span></th><th><span class="cr"></span></th></tr>';
   rows.forEach(function(r,i){h+='<tr'+(i===0?' class="f"':"")+"><td>"+(i+1)+'</td><td class="l">'+esc(r.n)+'</td><td class="p">'+r.ch+"</td><td>"+r.t+"</td><td>"+r.o+"</td><td>"+r.g+"</td><td>"+r.b+"</td><td>"+r.m+"</td><td>"+r.gf+"-"+r.ga+"</td><td>"+(r.gf-r.ga)+"</td><td>"+r.y+"</td><td>"+r.k+"</td></tr>"});
-  h+='</table></div><div class="mu">🏆 şampiyonluk, T turnuva, O oynanan maç, G/B/M galibiyet/beraberlik/mağlubiyet, Gol atılan-yenen, AV averaj. Eleme maçlarında normal süre skoru sayılır.</div>';
+  h+='</table></div><div class="mu">🏆 şampiyonluk, T turnuva, O oynanan maç (serbest maçlar dahil), G/B/M galibiyet/beraberlik/mağlubiyet, Gol atılan-yenen, AV averaj. Eleme maçlarında normal süre skoru sayılır.</div>';
   // oyuncular arası
   var cs=rows.map(function(r){return r.c});if(cs.length<2)return h;
   var a=V.sa,b=V.sb;if(cs.indexOf(a)<0)a=cs[0];if(cs.indexOf(b)<0||b===a)b=cs[0]===a?cs[1]:cs[0];
@@ -361,14 +370,19 @@ function render(){
   else if(V.v==="hist")h=hist();
   else if(V.v==="stats")h=stats();
   else if(V.v.slice(0,3)==="org")h=orgRender();
+  else if(V.v==="free")h=freeV();
+  else if(V.v==="pay")h=payV();
+  else if(V.v==="pview")h=viewV();
   else if(V.v!=="tour"||!S)h=menu();
   else{
     var d=S.matches.filter(function(x){return x.d&&!x.bye}).length;
-    h=head(esc(S.name),null,'<button class="g" onclick="go(\'hist\',{from:\''+S.id+'\',back:1})">📊 Geçmiş</button>')+'<div class="mu" style="text-align:left;margin-bottom:10px"><span class="tg">'+(S.mode==="eleme"?"Turnuva":"Lig")+'</span><span class="tg">'+(S.legs===2?"Rövanşlı":"Rövanşsız")+'</span>Her skor kendiliğinden kaydedilir.</div><div class="tabs"><button class="'+(S.tab===0?"on":"")+'" onclick="tab(0)">Fikstür ('+d+"/"+S.matches.filter(function(x){return !x.bye}).length+')</button><button class="'+(S.tab===1?"on":"")+'" onclick="tab(1)">'+(S.mode==="eleme"?"İstatistik":"Puan durumu")+'</button><button class="'+(S.tab===2?"on":"")+'" onclick="tab(2)">Oyuncular</button></div>'+(S.tab===0?fix():S.tab===1?stand():plist())}
+    h=(S.view?head(esc(S.name),"go(\'pview\')"):head(esc(S.name),null,'<div class="row"><button class="g" onclick="payOpenScreen()">🔗 Paylaş</button><button class="g" onclick="go(\'hist\',{from:\''+S.id+'\',back:1})">📊 Geçmiş</button></div>'))
+      +(S.gone?'<div class="card" style="color:var(--rd)">Bu turnuva kurucusu tarafından silindi ya da paylaşımı kaldırıldı. Gördüğün son halidir.</div>':"")
+      +'<div class="mu" style="text-align:left;margin-bottom:10px"><span class="tg">'+(S.mode==="eleme"?"Turnuva":"Lig")+'</span><span class="tg">'+(S.legs===2?"Rövanşlı":"Rövanşsız")+'</span>'+(S.view?'<span class="tg ok">👁 İzleyici</span>Kurucu skor girdikçe güncellenir.':(S.pay?'<span class="tg ok">🔗 Paylaşılıyor</span>':"")+"Her skor kendiliğinden kaydedilir.")+'</div><div class="tabs"><button class="'+(S.tab===0?"on":"")+'" onclick="tab(0)">Fikstür ('+d+"/"+S.matches.filter(function(x){return !x.bye}).length+')</button><button class="'+(S.tab===1?"on":"")+'" onclick="tab(1)">'+(S.mode==="eleme"?"İstatistik":"Puan durumu")+'</button><button class="'+(S.tab===2?"on":"")+'" onclick="tab(2)">Oyuncular</button></div>'+(S.tab===0?fix():S.tab===1?stand():plist())}
   $("#app").innerHTML=h}
 // açılış: logo kısa süre görünür, sonra ana menü
 (function(){var sp=$("#splash");if(DB.cur&&DB.tours[DB.cur])S=DB.tours[DB.cur];setTimeout(function(){sp.classList.add("off");setTimeout(function(){sp.remove()},500)},1400)})();
 document.addEventListener("focusin",function(e){var t=e.target;if(t.type==="number"&&t.value==="0")t.value=""});
 document.addEventListener("focusout",function(e){var t=e.target;if(t.type==="number"&&t.value==="")t.value="0"});
 window.addEventListener("load",render);
-</script><script src="png.js"></script><script src="org.js"></script></body></html>
+</script><script src="png.js"></script><script src="org.js"></script><script src="pay.js"></script></body></html>

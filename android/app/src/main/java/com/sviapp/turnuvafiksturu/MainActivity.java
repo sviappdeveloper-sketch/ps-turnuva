@@ -53,6 +53,7 @@ public class MainActivity extends Activity {
         web.setOverScrollMode(WebView.OVER_SCROLL_NEVER);
         web.addJavascriptInterface(new Reklam(), "TFReklam");
         web.addJavascriptInterface(new Paylas(), "TFPaylas");
+        web.addJavascriptInterface(new Cikis(), "TFCikis");
         web.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest r) {
@@ -78,6 +79,7 @@ public class MainActivity extends Activity {
         if (saved != null) web.restoreState(saved);
         else web.loadUrl("file:///android_asset/public/index.html");
         setupAds();
+        geriKaydet();
     }
 
     // AEA/BK kullanıcıları için izin formu (UMP), ardından AdMob başlatılır
@@ -119,6 +121,13 @@ public class MainActivity extends Activity {
 
     // PNG paylaşımı: sayfa window.TFPaylas.png(base64, dosyaAdı) çağırır, Android paylaş menüsü açılır
     private class Paylas {
+        // düz metin paylaşımı (turnuva kodu): window.TFPaylas.metin("...")
+        @JavascriptInterface public void metin(String t) {
+            Intent i = new Intent(Intent.ACTION_SEND);
+            i.setType("text/plain");
+            i.putExtra(Intent.EXTRA_TEXT, t == null ? "" : t);
+            main.post(() -> startActivity(Intent.createChooser(i, "Paylaş")));
+        }
         @JavascriptInterface public void png(String b64, String ad) {
             try {
                 byte[] veri = Base64.decode(b64, Base64.DEFAULT);
@@ -149,14 +158,34 @@ public class MainActivity extends Activity {
         web.saveState(out);
     }
 
-    // Geri tuşu: alt ekrandaysa bir önceki ekrana döner, ana menüdeyse uygulamadan çıkar.
-    @Override
-    @SuppressWarnings("deprecation")
-    public void onBackPressed() {
-        String js = "(function(){try{if(typeof V!=='undefined'&&V&&V.v!=='menu'){"
-                + "var b=document.querySelector('.top .back');if(b){b.click()}else{go('menu')}return 'ok'}}catch(e){}return 'exit'})()";
-        web.evaluateJavascript(js, val -> {
-            if (val == null || val.contains("exit")) finish();
+    // Geri tuşu / geri hareketi: sayfadaki appBack() karar verir. Alt ekrandaysa bir önceki ekrana döner;
+    // ana menüde "Uygulamadan çıkmak istiyor musunuz?" sorulur, Evet denirse TFCikis.cik() uygulamayı kapatır.
+    private void geri() {
+        web.evaluateJavascript("(function(){try{if(window.appBack)return appBack()}catch(e){}return 'exit'})()", val -> {
+            if (val != null && val.contains("exit")) finish();
         });
     }
+
+    private class Cikis {
+        @JavascriptInterface public void cik() { main.post(MainActivity.this::finish); }
+    }
+
+    // Android 13+ (hedef API 36): geri hareketi onBackPressed'i çağırmaz, bu yüzden geri çağrısı kaydedilir
+    private android.window.OnBackInvokedCallback geriCagri;
+    private void geriKaydet() {
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+            geriCagri = this::geri;
+            getOnBackInvokedDispatcher().registerOnBackInvokedCallback(android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT, geriCagri);
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (android.os.Build.VERSION.SDK_INT >= 33 && geriCagri != null) getOnBackInvokedDispatcher().unregisterOnBackInvokedCallback(geriCagri);
+        super.onDestroy();
+    }
+
+    @Override
+    @SuppressWarnings("deprecation")
+    public void onBackPressed() { geri(); }
 }
