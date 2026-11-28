@@ -35,6 +35,13 @@ final class AppViewController: UIViewController {
     cfg.websiteDataStore = .default()   // localStorage kalıcı
     // PNG paylaşımı: window.TFPaylas.png(base64, dosyaAdı) → iOS paylaş menüsü
     cfg.userContentController.add(WeakMessageHandler(self), name: "tfpng")
+    // organizasyon bildirimleri: window.TFBildirim.ayarla(json) / izinIste()
+    cfg.userContentController.add(WeakMessageHandler(self), name: "tfbil")
+    cfg.userContentController.addUserScript(WKUserScript(
+      source: "window.TFBildirim={ayarla:function(j){window.webkit.messageHandlers.tfbil.postMessage({k:'ayarla',j:j})},izinIste:function(){window.webkit.messageHandlers.tfbil.postMessage({k:'izin'})}};",
+      injectionTime: .atDocumentStart, forMainFrameOnly: true))
+    cfg.userContentController.addUserScript(WKUserScript(
+      source: "window.TFKaydir=1;", injectionTime: .atDocumentStart, forMainFrameOnly: true))
     cfg.userContentController.addUserScript(WKUserScript(
       source: "window.TFPaylas={png:function(b,n){window.webkit.messageHandlers.tfpng.postMessage({b:b,n:n})}};",
       injectionTime: .atDocumentStart, forMainFrameOnly: true))
@@ -55,7 +62,25 @@ final class AppViewController: UIViewController {
     web.allowsLinkPreview = false
     web.navigationDelegate = self
     view.addSubview(web)
+    // soldan kenar kaydırması: sayfadaki appSwipeBack() bir önceki ekrana döner (ana menüde bir şey yapmaz)
+    let kenar = UIScreenEdgePanGestureRecognizer(target: self, action: #selector(kenarKaydir(_:)))
+    kenar.edges = .left
+    kenar.delegate = self
+    web.addGestureRecognizer(kenar)
     web.load(URLRequest(url: URL(string: "\(Self.scheme)://app/index.html")!))
+    acGozcu = NotificationCenter.default.addObserver(forName: OrgKontrol.acNotu, object: nil, queue: .main) { [weak self] _ in
+      self?.orgAc()
+    }
+  }
+
+  private var acGozcu: NSObjectProtocol?
+  private var sayfaHazir = false
+  // bildirime dokunulduysa sayfa hazır olunca o organizasyonu aç
+  fileprivate func orgAc() {
+    guard sayfaHazir, let id = OrgKontrol.bekleyen else { return }
+    OrgKontrol.bekleyen = nil
+    let temiz = id.filter { $0.isLetter || $0.isNumber }
+    if !temiz.isEmpty { web.evaluateJavaScript("window.orgOpen&&orgOpen('\(temiz)')", completionHandler: nil) }
   }
 
   private var activeObs: NSObjectProtocol?
@@ -128,6 +153,17 @@ final class AppViewController: UIViewController {
   }
 }
 
+extension AppViewController: UIGestureRecognizerDelegate {
+  @objc fileprivate func kenarKaydir(_ g: UIScreenEdgePanGestureRecognizer) {
+    guard g.state == .ended else { return }
+    let t = g.translation(in: view)
+    if t.x > 60 || g.velocity(in: view).x > 500 {
+      web.evaluateJavaScript("window.appSwipeBack&&appSwipeBack()", completionHandler: nil)
+    }
+  }
+  func gestureRecognizer(_ g: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith o: UIGestureRecognizer) -> Bool { true }
+}
+
 extension AppViewController {
   fileprivate func sharePNG(base64: String, name: String) {
     guard let data = Data(base64Encoded: base64) else { return }
@@ -154,6 +190,13 @@ private final class WeakMessageHandler: NSObject, WKScriptMessageHandler {
   weak var target: AppViewController?
   init(_ t: AppViewController) { target = t }
   func userContentController(_ c: WKUserContentController, didReceive message: WKScriptMessage) {
+    if message.name == "tfbil", let d = message.body as? [String: Any] {
+      if (d["k"] as? String) == "ayarla", let j = d["j"] as? String {
+        OrgKontrol.ayarla(j)
+        if j.contains("\"id\"") { OrgKontrol.izinIste(ilk: true) }
+      } else if (d["k"] as? String) == "izin" { OrgKontrol.izinIste(ilk: false) }
+      return
+    }
     if message.name == "tfpng", let d = message.body as? [String: Any], let b = d["b"] as? String {
       target?.sharePNG(base64: b, name: (d["n"] as? String) ?? "turnuva.png"); return
     }
@@ -173,6 +216,7 @@ extension AppViewController: WKNavigationDelegate {
     decisionHandler(.cancel)
   }
   func webViewWebContentProcessDidTerminate(_ webView: WKWebView) { webView.reload() }
+  func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { sayfaHazir = true; orgAc() }
 }
 
 // Uygulama içindeki public/ klasörünü "fikstur://app/..." adresinden sunar

@@ -1,6 +1,6 @@
 rules_version = '2';
 // Turnuva Fikstürü · Organizasyonlar
-// orgs/{kod}            : organizasyon (ad, pub, owner, upd, d=JSON veri)
+// orgs/{kod}            : organizasyon (ad, pub, owner, upd, d=JSON veri; bas/bit=tarihler; oy/mt/sp=özet)
 // orgs/{kod}/eds/{uid}  : yönetici şifresini girenler (p=şifre, n=ad)
 // orgs/{kod}/vw/{uid}   : kapalı organizasyonu izleme şifresiyle açanlar
 // sec/{kod}             : şifreler (e=yönetici, v=izleme), yalnızca kurucu okur
@@ -17,12 +17,14 @@ service cloud.firestore {
 
     match /orgs/{id} {
       allow get: if resource.data.pub == true || (signed() && resource.data.owner == request.auth.uid) || isEd(id) || isVw(id);
-      allow list: if resource.data.pub == true;
+      // herkese açıklar herkese; kurucu kendi organizasyonlarını (mail ile girişte başka telefondan) listeleyebilir
+      allow list: if resource.data.pub == true || (signed() && resource.data.owner == request.auth.uid);
       allow create: if signed() && request.resource.data.owner == request.auth.uid && id.size() >= 6 && id.size() <= 12 && okData(request.resource.data);
+      // kurucu her şeyi değiştirir (mail hesabına geçerken sahipliği de devreder); yönetici sahipliği ve görünürlüğü değiştiremez
       allow update: if signed() && okData(request.resource.data)
-        && request.resource.data.owner == resource.data.owner
+        && request.resource.data.owner is string && request.resource.data.owner.size() > 0
         && (resource.data.owner == request.auth.uid
-            || (isEd(id) && request.resource.data.pub == resource.data.pub));
+            || (isEd(id) && request.resource.data.owner == resource.data.owner && request.resource.data.pub == resource.data.pub));
       allow delete: if signed() && resource.data.owner == request.auth.uid;
 
       match /eds/{uid} {

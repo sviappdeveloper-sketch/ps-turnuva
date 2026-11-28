@@ -118,7 +118,13 @@ window.appBack=function(){
   if($("#exitAsk")){exitAsk(0);return"ok"}
   if(V.v==="menu"||(V.v==="tour"&&!S)){exitAsk(1);return"ok"}
   var b=document.querySelector("#app .top .back");if(b)b.click();else go("menu");return"ok"};
-// iPhone: soldan kenar kaydırması geri gider (ana menüde bir şey yapmaz; iOS uygulamaları kendini kapatmaz)
-(function(){if(!/iPhone|iPad|iPod/.test(navigator.userAgent))return;var sx=-1,sy=0;
-  document.addEventListener("touchstart",function(e){var t=e.touches[0];sx=t.clientX<28?t.clientX:-1;sy=t.clientY},{passive:true});
-  document.addEventListener("touchend",function(e){if(sx<0)return;var t=e.changedTouches[0];if(t.clientX-sx>80&&Math.abs(t.clientY-sy)<70&&V.v!=="menu"&&!(V.v==="tour"&&!S)){var b=document.querySelector("#app .top .back");if(b)b.click()}sx=-1},{passive:true})})();
+// iPhone: soldan kenar kaydırması geri gider (ana menüde bir şey yapmaz; iOS uygulamaları kendini kapatmaz).
+// iPhone kabuğu kaydırmayı kendisi yakalayıp appSwipeBack() çağırır (window.TFKaydir); yoksa aşağıdaki dokunma takibi çalışır.
+window.appSwipeBack=function(){
+  if($("#exitAsk")){exitAsk(0);return"ok"}
+  if(V.v==="menu"||(V.v==="tour"&&!S))return"menu";
+  var b=document.querySelector("#app .top .back");if(b)b.click();else go("menu");return"ok"};
+(function(){if(!/iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent)||!("ontouchstart" in window))return;var sx=-1,sy=0;
+  document.addEventListener("touchstart",function(e){if(window.TFKaydir)return;var t=e.touches[0];sx=t.clientX<40?t.clientX:-1;sy=t.clientY},{passive:true});
+  document.addEventListener("touchend",function(e){if(sx<0||window.TFKaydir)return;var t=e.changedTouches[0];if(t.clientX-sx>60&&Math.abs(t.clientY-sy)<Math.max(80,t.clientX-sx))appSwipeBack();sx=-1},{passive:true});
+  document.addEventListener("touchcancel",function(){sx=-1},{passive:true})})();

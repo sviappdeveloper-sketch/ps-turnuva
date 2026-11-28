@@ -54,6 +54,8 @@ public class MainActivity extends Activity {
         web.addJavascriptInterface(new Reklam(), "TFReklam");
         web.addJavascriptInterface(new Paylas(), "TFPaylas");
         web.addJavascriptInterface(new Cikis(), "TFCikis");
+        web.addJavascriptInterface(new Bildirim(), "TFBildirim");
+        bekleyenOrg = getIntent() == null ? null : getIntent().getStringExtra("org");
         web.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest r) {
@@ -63,6 +65,7 @@ public class MainActivity extends Activity {
                 try { startActivity(new Intent(Intent.ACTION_VIEW, u)); } catch (Exception ignored) {}
                 return true;   // dış bağlantılar tarayıcıda açılır
             }
+            @Override public void onPageFinished(WebView v, String url) { orgAc(); }
         });
         // Android 15+ uygulamayı ekranın kenarına kadar çizer; durum çubuğu ve alt gezinme
         // çubuğu kadar boşluk bırakılır ki içerik onların altında kalmasın.
@@ -160,10 +163,72 @@ public class MainActivity extends Activity {
 
     // Geri tuşu / geri hareketi: sayfadaki appBack() karar verir. Alt ekrandaysa bir önceki ekrana döner;
     // ana menüde "Uygulamadan çıkmak istiyor musunuz?" sorulur, Evet denirse TFCikis.cik() uygulamayı kapatır.
+    // Sayfa cevap veremezse (yüklenmemiş, hata) uygulama yine tek geriyle kapanmaz: aynı soru yerel pencereyle sorulur.
     private void geri() {
-        web.evaluateJavascript("(function(){try{if(window.appBack)return appBack()}catch(e){}return 'exit'})()", val -> {
-            if (val != null && val.contains("exit")) finish();
+        if (soruAcik) return;
+        web.evaluateJavascript("(function(){try{if(window.appBack)return appBack()}catch(e){}return 'ask'})()", val -> {
+            if (val == null || !val.contains("ok")) cikisSor();
         });
+    }
+
+    private boolean soruAcik;
+    private void cikisSor() {
+        if (soruAcik || isFinishing()) return;
+        soruAcik = true;
+        new android.app.AlertDialog.Builder(this)
+            .setMessage("Uygulamadan çıkmak istiyor musunuz?")
+            .setNegativeButton("Hayır", (d, w) -> d.dismiss())
+            .setPositiveButton("Evet", (d, w) -> finish())
+            .setOnDismissListener(d -> soruAcik = false)
+            .show();
+    }
+
+    // ---------------- organizasyon bildirimleri (OrgKontrol) ----------------
+    private String bekleyenOrg;   // bildirime dokunulunca açılacak organizasyon kodu
+    private void orgAc() {
+        if (bekleyenOrg == null) return;
+        String id = bekleyenOrg.replaceAll("[^A-Za-z0-9]", "");
+        bekleyenOrg = null;
+        if (!id.isEmpty()) web.evaluateJavascript("window.orgOpen&&orgOpen('" + id + "')", null);
+    }
+    @Override
+    protected void onNewIntent(Intent i) {
+        super.onNewIntent(i);
+        setIntent(i);
+        bekleyenOrg = i.getStringExtra("org");
+        orgAc();
+    }
+    private static final String IZIN = "android.permission.POST_NOTIFICATIONS";
+    private class Bildirim {
+        @JavascriptInterface public void ayarla(String j) {
+            OrgKontrol.ayarla(getApplicationContext(), j == null ? "{}" : j);
+            if (j != null && j.contains("\"id\"")) main.post(MainActivity.this::ilkIzin);
+        }
+        @JavascriptInterface public void izinIste() { main.post(MainActivity.this::izinIste); }
+    }
+    // ilk organizasyon takibe alındığında bildirim izni bir kez sorulur (Android 13+)
+    private void ilkIzin() {
+        if (android.os.Build.VERSION.SDK_INT < 33) return;
+        android.content.SharedPreferences p = getSharedPreferences(OrgKontrol.PREF, 0);
+        if (p.getBoolean("soruldu", false) || checkSelfPermission(IZIN) == android.content.pm.PackageManager.PERMISSION_GRANTED) return;
+        p.edit().putBoolean("soruldu", true).apply();
+        requestPermissions(new String[]{IZIN}, 7);
+    }
+    // 🔔 açılınca: izin yoksa sorulur; kesin reddedildiyse bildirim ayarları açılır
+    private void izinIste() {
+        boolean acik = androidx.core.app.NotificationManagerCompat.from(this).areNotificationsEnabled();
+        if (android.os.Build.VERSION.SDK_INT >= 33 && checkSelfPermission(IZIN) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            android.content.SharedPreferences p = getSharedPreferences(OrgKontrol.PREF, 0);
+            if (!p.getBoolean("soruldu", false) || shouldShowRequestPermissionRationale(IZIN)) {
+                p.edit().putBoolean("soruldu", true).apply();
+                requestPermissions(new String[]{IZIN}, 7);
+                return;
+            }
+            acik = false;
+        }
+        if (!acik && android.os.Build.VERSION.SDK_INT >= 26) {
+            try { startActivity(new Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, getPackageName())); } catch (Exception ignored) {}
+        }
     }
 
     private class Cikis {
