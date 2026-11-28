@@ -41,6 +41,6 @@ dependencies {
     implementation 'com.google.android.ump:user-messaging-platform:3.2.0'
     implementation 'androidx.core:core:1.13.1'
     implementation 'androidx.work:work-runtime:2.10.1'
-    implementation 'com.google.guava:listenablefuture:1.0'   // WorkManager'ın Java'dan derlenmesi için
+    implementation 'com.google.guava:guava:33.3.1-android'   // WorkManager'ın Java'dan derlenmesi için (ListenableFuture)
 }
 tasks.named("preBuild") { dependsOn copyWeb }
